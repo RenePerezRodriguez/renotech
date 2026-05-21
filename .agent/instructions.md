@@ -38,6 +38,7 @@ Cualquier cambio de código debe seguir estrictamente la política definida en `
 * El desarrollo y las pruebas en vivo de App Hosting ocurren en la rama `develop`.
 * El despliegue a producción solo ocurre al fusionar `develop` en `main` y empujar a GitHub.
 * **PROHIBIDO** realizar commits directos a `main` sin probar previamente en `develop`.
+* **PROHIBIDO** ejecutar comandos de git destructivos, commits, pushes, merges o cambios de rama de forma autónoma sin que el USER lo haya solicitado o autorizado explícitamente.
 
 > [!IMPORTANT]
 > **Renotech no es solo código; es ingeniería de precisión.** La fidelidad a la arquitectura diseñada es lo que garantiza la escalabilidad nacional y la integridad financiera de la plataforma.

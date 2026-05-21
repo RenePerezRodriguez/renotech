@@ -71,3 +71,5 @@ Cuando una versión en `develop` sea completamente estable y haya sido validada 
 *   **Prohibido hacer push directo a `main`**: Todo cambio debe pasar y probarse primero en `develop`.
 *   **Mensajes de Commit Claros**: Utilizar prefijos convencionales (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`).
 *   **Mantener el Historial Limpio**: Evitar subir archivos temporales, tokens, credenciales o carpetas compiladas (asegurar que el `.gitignore` esté actualizado).
+*   **Aprobación del Usuario para Comandos Git**: Los agentes de IA tienen **PROHIBIDO** ejecutar operaciones autónomas de Git que modifiquen el repositorio o las ramas (como `git commit`, `git push`, `git merge`, `git checkout`, `git reset`, etc.) sin la solicitud explícita o confirmación previa del USER.
+
