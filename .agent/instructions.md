@@ -33,5 +33,11 @@ Todo componente de interfaz **DEBE** respetar `.agent/workflows/graphic-line.md`
 * Zero-Glass Strategy: Sin `backdrop-blur` en dark mode operacional.
 * Referencia completa de tokens en `docs/architecture/ui_impact_and_components.md` sección 2.4.
 
+## 5. Flujo de Git y Despliegue
+Cualquier cambio de código debe seguir estrictamente la política definida en `.agent/workflows/git-workflow.md`:
+* El desarrollo y las pruebas en vivo de App Hosting ocurren en la rama `develop`.
+* El despliegue a producción solo ocurre al fusionar `develop` en `main` y empujar a GitHub.
+* **PROHIBIDO** realizar commits directos a `main` sin probar previamente en `develop`.
+
 > [!IMPORTANT]
 > **Renotech no es solo código; es ingeniería de precisión.** La fidelidad a la arquitectura diseñada es lo que garantiza la escalabilidad nacional y la integridad financiera de la plataforma.
