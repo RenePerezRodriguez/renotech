@@ -1,0 +1,4 @@
+'use client';
+export default function DebugEnvios() {
+    return <div className="p-10 text-red-500 font-bold bg-white">DEBUG: El modulo de envios esta intentando cargar...</div>;
+}

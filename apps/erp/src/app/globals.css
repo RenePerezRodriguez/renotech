@@ -1,0 +1,567 @@
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+/* @plugin "tw-animate-css"; */
+
+/* ─── Driver.js tour custom styles ─── */
+.renotech-tour-popover {
+  background: #fff !important;
+  border-radius: 14px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18) !important;
+  padding: 20px !important;
+  max-width: 320px !important;
+  font-family: inherit !important;
+}
+.dark .renotech-tour-popover {
+  background: #0f172a !important;
+  border-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+.renotech-tour-popover .driver-popover-title {
+  font-size: 14px !important;
+  font-weight: 800 !important;
+  color: #0f172a !important;
+  margin-bottom: 8px !important;
+  letter-spacing: -0.01em !important;
+}
+.dark .renotech-tour-popover .driver-popover-title { color: #f1f5f9 !important; }
+.renotech-tour-popover .driver-popover-description {
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+  color: #475569 !important;
+}
+.dark .renotech-tour-popover .driver-popover-description { color: #94a3b8 !important; }
+.renotech-tour-popover .driver-popover-footer {
+  margin-top: 16px !important;
+  gap: 8px !important;
+}
+.renotech-tour-popover .driver-popover-btn-group button {
+  border-radius: 10px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding: 7px 14px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: opacity 0.15s !important;
+}
+.renotech-tour-popover .driver-popover-next-btn {
+  background: #0f172a !important;
+  color: #fff !important;
+}
+.renotech-tour-popover .driver-popover-prev-btn {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}
+.renotech-tour-popover .driver-popover-close-btn {
+  color: #94a3b8 !important;
+  font-size: 16px !important;
+}
+.renotech-tour-popover .driver-popover-progress-text {
+  font-size: 10px !important;
+  color: #94a3b8 !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .animate-blob, .animate-bounce, .animate-spin, .animate-pulse,
+  .chat-cursor, .stagger-children > * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ─── Chat streaming cursor ─── */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+.chat-cursor {
+  animation: cursor-blink 0.85s step-end infinite;
+}
+
+/* ─── Chat markdown ─── */
+
+/* Spacing between consecutive block elements — avoids double-space from whitespace-pre-wrap */
+.chat-markdown > * + * {
+  margin-top: 0.35rem;
+}
+
+/* Lists */
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: 1.1rem;
+}
+.chat-markdown li + li {
+  margin-top: 0.15rem;
+}
+.chat-markdown ul li::marker {
+  color: currentColor;
+  opacity: 0.5;
+}
+.chat-markdown ol li::marker {
+  font-weight: 700;
+  font-size: 0.7em;
+  opacity: 0.6;
+}
+
+/* Code blocks */
+.chat-markdown pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+.chat-markdown code {
+  font-size: 0.8em;
+}
+
+/* Paragraphs */
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+/* Misc */
+.chat-markdown hr {
+  opacity: 0.25;
+  margin: 0.4rem 0;
+}
+.chat-markdown strong {
+  font-weight: 600;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+.dark {
+  --background: #020617; /* Solid Deep Industrial Navy (Slate 950) */
+  --foreground: #f8fafc;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  overflow: hidden;
+  /* Prevent global scroll for app-like feel */
+}
+
+/* Scrollbar Utils */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Premium Selection */
+::selection {
+  background-color: #f59e0b; /* Amber 500 */
+  color: black;
+}
+
+/* Custom Scrollbar for Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* Gray 300 */
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b; /* Slate 800 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* Gray 400 */
+}
+
+/* ── Page transition animations ─────────────────────────────────── */
+@keyframes page-enter {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes page-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Stagger utility: apply to a grid/flex container; first 8 children fade-in with cascade */
+.stagger-children > * {
+    animation: card-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 70ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 140ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 210ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 280ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 350ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 420ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 490ms; }
+.stagger-children > *:nth-child(n+9) { animation-delay: 540ms; }
+
+/* ── Splash screen progress bar ──────────────────────────────────── */
+@keyframes splash-progress {
+    0%   { width: 0%;    opacity: 1; }
+    85%  { width: 92%;   opacity: 1; }
+    100% { width: 100%;  opacity: 0.6; }
+}
+
+/* ── Blob / ambient animations (login bg) ────────────────────────── */
+@keyframes blob {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33%       { transform: translate(20px, -30px) scale(1.08); }
+    66%       { transform: translate(-15px, 20px) scale(0.95); }
+}
+
+.animate-blob {
+    animation: blob 9s ease-in-out infinite;
+}
+
+.animation-delay-4000 {
+    animation-delay: 4s;
+}
+
+/* ── tw-animate-css replacement ──────────────────────────────────
+   The plugin was removed due to Tailwind v4 / Turbopack incompatibility.
+   These manual definitions replicate all animation utilities used across
+   the project (100+ usages).
+   ─────────────────────────────────────────────────────────────── */
+
+/* Base: .animate-in triggers the composed animation */
+.animate-in {
+    animation-name: enter;
+    animation-duration: var(--tw-animate-duration, 150ms);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: both;
+
+    --tw-enter-opacity: 1;
+    --tw-enter-scale: 1;
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+}
+
+@keyframes enter {
+    from {
+        opacity: var(--tw-enter-opacity, 1);
+        transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+                   scale(var(--tw-enter-scale, 1));
+    }
+}
+
+/* Fade */
+.fade-in    { --tw-enter-opacity: 0; }
+
+/* Scale / Zoom */
+.zoom-in-50  { --tw-enter-scale: 0.50; }
+.zoom-in-75  { --tw-enter-scale: 0.75; }
+.zoom-in-90  { --tw-enter-scale: 0.90; }
+.zoom-in-95  { --tw-enter-scale: 0.95; }
+
+/* Slide from top */
+.slide-in-from-top-2   { --tw-enter-translate-y: -0.5rem; }
+.slide-in-from-top-4   { --tw-enter-translate-y: -1rem; }
+.slide-in-from-top-8   { --tw-enter-translate-y: -2rem; }
+.slide-in-from-top-10  { --tw-enter-translate-y: -2.5rem; }
+
+/* Slide from bottom */
+.slide-in-from-bottom-2  { --tw-enter-translate-y: 0.5rem; }
+.slide-in-from-bottom-4  { --tw-enter-translate-y: 1rem; }
+.slide-in-from-bottom-8  { --tw-enter-translate-y: 2rem; }
+.slide-in-from-bottom-10 { --tw-enter-translate-y: 2.5rem; }
+
+/* Slide from left */
+.slide-in-from-left-6   { --tw-enter-translate-x: -1.5rem; }
+.slide-in-from-left-8   { --tw-enter-translate-x: -2rem; }
+
+/* Slide from right */
+.slide-in-from-right     { --tw-enter-translate-x: 100%; }
+
+/* Duration modifiers — only apply to animation when used with .animate-in */
+.animate-in.duration-100 { --tw-animate-duration: 100ms; }
+.animate-in.duration-150 { --tw-animate-duration: 150ms; }
+.animate-in.duration-200 { --tw-animate-duration: 200ms; }
+.animate-in.duration-300 { --tw-animate-duration: 300ms; }
+.animate-in.duration-500 { --tw-animate-duration: 500ms; }
+.animate-in.duration-700 { --tw-animate-duration: 700ms; }
+
+/* Fill mode */
+.fill-mode-both { animation-fill-mode: both; }
+
+@layer utilities {
+  .print-only {
+    display: none;
+  }
+
+  /* Solid Industrial Utilities */
+  .industrial-surface-top {
+    @apply dark:bg-[#111827] dark:border-white/5;
+  }
+
+  .industrial-surface-base {
+    @apply dark:bg-[#020617];
+  }
+
+  .industrial-shadow {
+    @apply shadow-[0_4px_12px_-4px_rgba(0,0,0,0.12)] dark:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.7)];
+  }
+
+  .status-glow-yellow {
+    @apply drop-shadow-[0_0_2px_rgba(255,215,0,0.5)];
+  }
+}
+
+/* ── Dark mode global surface overrides ─────────────────────────
+   Unlayered rules override Tailwind @layer utilities when .dark
+   is active, covering components that lack explicit dark: variants.
+─────────────────────────────────────────────────────────────────*/
+
+/* Surfaces */
+.dark .bg-white        { background-color: #0f172a; }
+.dark .bg-slate-50     { background-color: #020617; }
+.dark .bg-slate-100    { background-color: #0d1526; }
+.dark .bg-slate-200    { background-color: #1e293b; }
+.dark .bg-gray-50      { background-color: #020617; }
+.dark .bg-gray-100     { background-color: #0d1526; }
+.dark .bg-gray-200     { background-color: #1e293b; }
+
+/* Hover surfaces */
+.dark .hover\:bg-white:hover      { background-color: rgba(255,255,255,0.05); }
+.dark .hover\:bg-slate-50:hover   { background-color: rgba(255,255,255,0.03); }
+.dark .hover\:bg-slate-100:hover  { background-color: rgba(255,255,255,0.05); }
+.dark .hover\:bg-slate-200:hover  { background-color: rgba(255,255,255,0.08); }
+.dark .hover\:bg-gray-50:hover    { background-color: rgba(255,255,255,0.03); }
+.dark .hover\:bg-gray-100:hover   { background-color: rgba(255,255,255,0.05); }
+
+/* Active surfaces */
+.dark .active\:bg-slate-100:active { background-color: rgba(255,255,255,0.05); }
+.dark .active\:bg-slate-200:active { background-color: rgba(255,255,255,0.08); }
+
+/* Focus surfaces (inputs) */
+.dark .focus\:bg-white:focus    { background-color: rgba(255,255,255,0.05); }
+.dark .focus\:bg-slate-50:focus { background-color: rgba(255,255,255,0.03); }
+
+/* Text */
+.dark .text-slate-900 { color: #f8fafc; }
+.dark .text-slate-800 { color: #e2e8f0; }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #94a3b8; }
+.dark .text-gray-900  { color: #f8fafc; }
+.dark .text-gray-800  { color: #e2e8f0; }
+.dark .text-gray-700  { color: #cbd5e1; }
+.dark .text-gray-600  { color: #94a3b8; }
+
+/* Borders */
+.dark .border-slate-100 { border-color: rgba(255,255,255,0.05); }
+.dark .border-slate-200 { border-color: rgba(255,255,255,0.08); }
+.dark .border-slate-300 { border-color: rgba(255,255,255,0.12); }
+.dark .border-gray-100  { border-color: rgba(255,255,255,0.05); }
+.dark .border-gray-200  { border-color: rgba(255,255,255,0.08); }
+.dark .border-gray-300  { border-color: rgba(255,255,255,0.12); }
+
+/* Dividers */
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.05); }
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.08); }
+.dark .divide-gray-100  > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.05); }
+.dark .divide-gray-200  > :not([hidden]) ~ :not([hidden]) { border-color: rgba(255,255,255,0.08); }
+
+/* Input placeholders */
+.dark .placeholder-slate-300::placeholder { color: #475569; }
+.dark .placeholder-slate-400::placeholder { color: #64748b; }
+.dark .placeholder-gray-300::placeholder  { color: #475569; }
+.dark .placeholder-gray-400::placeholder  { color: #64748b; }
+
+/* Status badge backgrounds (pastel → tinted dark) */
+.dark .bg-emerald-50 { background-color: rgba( 16,185,129,0.1); }
+.dark .bg-rose-50    { background-color: rgba(244, 63, 94,0.1); }
+.dark .bg-red-50     { background-color: rgba(239, 68, 68,0.1); }
+.dark .bg-amber-50   { background-color: rgba(245,158, 11,0.1); }
+.dark .bg-yellow-50  { background-color: rgba(234,179,  8,0.1); }
+.dark .bg-blue-50    { background-color: rgba( 59,130,246,0.1); }
+.dark .bg-sky-50     { background-color: rgba( 14,165,233,0.1); }
+.dark .bg-indigo-50  { background-color: rgba( 99,102,241,0.1); }
+.dark .bg-purple-50  { background-color: rgba(168, 85,247,0.1); }
+.dark .bg-orange-50  { background-color: rgba(249,115, 22,0.1); }
+.dark .bg-teal-50    { background-color: rgba( 20,184,166,0.1); }
+.dark .bg-cyan-50    { background-color: rgba(  6,182,212,0.1); }
+.dark .bg-green-50   { background-color: rgba( 34,197, 94,0.1); }
+.dark .bg-pink-50    { background-color: rgba(236, 72,153,0.1); }
+
+/* Status badge borders */
+.dark .border-emerald-200 { border-color: rgba( 52,211,153,0.25); }
+.dark .border-rose-200    { border-color: rgba(251,113,133,0.25); }
+.dark .border-red-200     { border-color: rgba(252,165,165,0.25); }
+.dark .border-amber-200   { border-color: rgba(251,191, 36,0.25); }
+.dark .border-yellow-200  { border-color: rgba(253,224, 71,0.25); }
+.dark .border-blue-200    { border-color: rgba( 96,165,250,0.25); }
+.dark .border-indigo-200  { border-color: rgba(129,140,248,0.25); }
+.dark .border-purple-200  { border-color: rgba(192,132,252,0.25); }
+.dark .border-orange-200  { border-color: rgba(251,146, 60,0.25); }
+.dark .border-green-200   { border-color: rgba(134,239,172,0.25); }
+.dark .border-pink-200    { border-color: rgba(249,168,212,0.25); }
+
+/* Status text (shift to lighter tones for dark bg readability) */
+.dark .text-emerald-600, .dark .text-emerald-700 { color: #34d399; }
+.dark .text-rose-600,    .dark .text-rose-700    { color: #fb7185; }
+.dark .text-red-600,     .dark .text-red-700     { color: #f87171; }
+.dark .text-amber-600,   .dark .text-amber-700   { color: #fbbf24; }
+.dark .text-yellow-600,  .dark .text-yellow-700  { color: #facc15; }
+.dark .text-blue-600,    .dark .text-blue-700    { color: #60a5fa; }
+.dark .text-sky-600,     .dark .text-sky-700     { color: #38bdf8; }
+.dark .text-indigo-600,  .dark .text-indigo-700  { color: #818cf8; }
+.dark .text-purple-600,  .dark .text-purple-700  { color: #c084fc; }
+.dark .text-orange-600,  .dark .text-orange-700  { color: #fb923c; }
+.dark .text-teal-600,    .dark .text-teal-700    { color: #2dd4bf; }
+.dark .text-cyan-600,    .dark .text-cyan-700    { color: #22d3ee; }
+.dark .text-green-600,   .dark .text-green-700   { color: #4ade80; }
+.dark .text-pink-600,    .dark .text-pink-700    { color: #f472b6; }
+
+/* ── Login panel force-light (higher specificity beats dark overrides above) ──
+   El panel derecho del login usa data-theme="light" para quedarse siempre claro
+   independientemente del modo oscuro del sistema.
+────────────────────────────────────────────────────────────────────────────── */
+.dark [data-theme="light"] .bg-white        { background-color: #ffffff; }
+.dark [data-theme="light"] .bg-slate-50     { background-color: #f8fafc; }
+.dark [data-theme="light"] .bg-slate-100    { background-color: #f1f5f9; }
+.dark [data-theme="light"] .text-slate-900  { color: #0f172a; }
+.dark [data-theme="light"] .text-slate-800  { color: #1e293b; }
+.dark [data-theme="light"] .text-slate-700  { color: #334155; }
+.dark [data-theme="light"] .text-slate-600  { color: #475569; }
+.dark [data-theme="light"] .text-slate-400  { color: #94a3b8; }
+.dark [data-theme="light"] .border-slate-200 { border-color: #e2e8f0; }
+.dark [data-theme="light"] .border-slate-100 { border-color: #f1f5f9; }
+.dark [data-theme="light"] .shadow-slate-200\/60 { --tw-shadow-color: rgb(226 232 240 / 0.6); }
+.dark [data-theme="light"] .placeholder-slate-300::placeholder { color: #cbd5e1; }
+.dark [data-theme="light"] .placeholder-slate-400::placeholder { color: #94a3b8; }
+.dark [data-theme="light"] .focus\:bg-white:focus  { background-color: #ffffff; }
+.dark [data-theme="light"] .hover\:text-slate-600:hover { color: #475569; }
+
+@media print {
+
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only show the receipt, labels and their contents */
+  #receipt,
+  #receipt *,
+  #printable-receipt,
+  #printable-receipt *,
+  #quotation-receipt,
+  #quotation-receipt *,
+  #printable-label,
+  #printable-label * {
+    visibility: visible;
+  }
+
+  /* Position the receipt at top-left and size it for thermal paper */
+  #receipt,
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    /* Standard thermal printer width */
+    margin: 0;
+    padding: 0;
+    background: white;
+    font-size: 12px;
+    /* Ensure readable font size */
+    color: black;
+    z-index: 9999;
+    /* Ensure it's on top */
+    display: block !important;
+  }
+
+  /* Quotation specific sizing (Full Width) */
+  #quotation-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    /* A4 width */
+    min-height: 297mm;
+    /* A4 height */
+    margin: 0;
+    padding: 20mm;
+    background: white;
+    color: black;
+    z-index: 9999;
+    display: block !important;
+  }
+
+  /* Label specific sizing */
+  #printable-label {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 60mm;
+    height: 40mm;
+    margin: 0;
+    padding: 0;
+    background: white;
+    color: black;
+    z-index: 9999;
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Force hide problematic elements that persist with visibility:hidden */
+  nav,
+  aside,
+  header,
+  footer,
+  .sidebar,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset body background */
+  body {
+    background: white;
+    overflow: visible;
+  }
+}

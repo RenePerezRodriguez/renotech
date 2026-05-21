@@ -1,0 +1,17 @@
+# CODEOWNERS
+# Asignación de revisores para archivos críticos del sistema.
+
+# Por defecto, todos los archivos son asignados a René Pérez Rodríguez
+*       @RenePerezRodriguez
+
+# Archivos de configuración de despliegue e infraestructura
+/apphosting.yaml       @RenePerezRodriguez
+/firebase.json         @RenePerezRodriguez
+/firestore.rules       @RenePerezRodriguez
+/firestore.indexes.json @RenePerezRodriguez
+/storage.rules         @RenePerezRodriguez
+
+# Código crítico del motor del POS e Inventario
+/src/services/         @RenePerezRodriguez
+/src/logic/            @RenePerezRodriguez
+/scripts/migrations/   @RenePerezRodriguez

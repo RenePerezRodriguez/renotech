@@ -1,0 +1,732 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // 🛡️ FUNCIONES AUXILIARES
+    // ============================================================
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // 🔧 AUDIT FIX #1: Use custom claims instead of userData() to avoid circular dependency
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+
+    function getUserBranch() {
+      return request.auth.token.branchId;
+    }
+
+    // Legacy function - DEPRECATED, kept for reference
+    // function userData() {
+    //   return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    // }
+
+    // ============================================================
+    // 🛡️ FUNCIONES DE AUTORIDAD (Suite Pro v4.0)
+    // ============================================================
+
+    function isGerente() {
+      return isAuth() && getUserRole() == 'GERENTE';
+    }
+
+    function myBranch() {
+      return getUserBranch();
+    }
+
+    function isMyBranch(branchId) {
+      return isAuth() && branchId != null && myBranch() == branchId;
+    }
+
+    function isHQ() {
+      return isAuth() && get(/databases/$(database)/documents/branches/$(myBranch())).data.isHQ == true;
+    }
+
+    // ============================================================
+    // 🛡️ PERMISOS GRANULARES (RBAC v2)
+    // ============================================================
+    // Los permisos viajan en el custom claim `permissions: string[]`.
+    // El wildcard '*' concede cualquier permiso (usado por GERENTE).
+    // Helpers para usar en reglas: `hasPerm('audit:resolve')`, etc.
+    //
+    // Convención: las reglas mantienen `isGerente()` como bypass implícito
+    // y opcionalmente añaden `|| hasPerm('xxx')` cuando un rol custom debe
+    // poder ejecutar la acción.
+    function userPerms() {
+      return request.auth.token.permissions;
+    }
+    function hasPerm(p) {
+      return isAuth()
+        && userPerms() is list
+        && (('*' in userPerms()) || (p in userPerms()));
+    }
+
+    // ============================================================
+    // USERS — Se lee PRIMERO para que getUserData() funcione
+    // ============================================================
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && isGerente();
+      allow update: if isAuth() && (request.auth.uid == userId || isGerente());
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // CATÁLOGO MAESTRO — Blindaje Centralizado (HQ Only)
+    // ============================================================
+    match /catalogo_maestro/{docId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isHQ() && isGerente();
+    }
+
+    // ============================================================
+    // PRODUCTOS (Stock) — Escritura por sucursal, Identidad por HQ
+    // ============================================================
+    match /productos/{docId} {
+      allow read: if isAuth();
+      
+      // Permite creación si es HQ o si el usuario pertenece a la sucursal del producto (Alta Automática)
+      allow create: if isAuth() && (isHQ() || request.resource.data.branchId == myBranch());
+      
+      // Actualización: HQ Gerente todo. Sucursal puede tocar campos operativos
+      // (incluido `costo`, que se actualiza al registrar compras locales — el costo
+      // refleja el costo de adquisición real de la sucursal). Bloqueamos identidad
+      // (masterId/branchId) y precios de venta (políticas centralizadas en HQ).
+      allow update: if isAuth() && (
+        (isHQ() && isGerente()) ||
+        (
+          getUserBranch() == resource.data.branchId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'masterId', 'branchId',
+            'precio', 'precioConFactura', 'precioSinFactura'
+          ])
+        )
+      );
+      
+      allow delete: if isHQ() && isGerente();
+    }
+
+    // ============================================================
+    // VENTAS + items
+    // ============================================================
+    match /ventas/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isHQ() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth()
+        && (isHQ() || isMyBranch(resource.data.branchId))
+        && request.resource.data.branchId == resource.data.branchId;
+      allow delete: if isGerente();
+
+      match /items/{itemId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update, delete: if isGerente();
+      }
+    }
+
+    // ============================================================
+    // COTIZACIONES + items
+    // ============================================================
+    match /cotizaciones/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isHQ() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth()
+        && (isHQ() || isMyBranch(resource.data.branchId))
+        && request.resource.data.branchId == resource.data.branchId;
+      allow delete: if isAuth() && (isGerente() || isMyBranch(resource.data.branchId));
+
+      match /items/{itemId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update, delete: if isAuth();
+      }
+    }
+
+    // ============================================================
+    // TRASPASOS + items
+    // ============================================================
+    match /stockTransfers/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth(); 
+      allow update: if isAuth() && (
+        // Solo el remitente puede Aprobar o Cancelar
+        (request.resource.data.status in ['APPROVED', 'CANCELLED'] && resource.data.fromBranchId == myBranch()) ||
+        // Solo el receptor puede Completar, Rechazar o Revertir a Aprobado (undoReceive)
+        (request.resource.data.status in ['COMPLETED', 'REJECTED', 'APPROVED'] && resource.data.toBranchId == myBranch()) ||
+        // Gerente HQ puede todo
+        isHQ()
+      );
+      allow delete: if isHQ();
+
+      match /items/{itemId} {
+        allow read: if isAuth();
+        allow write: if isAuth() && (
+          isHQ() ||
+          get(/databases/$(database)/documents/stockTransfers/$(docId)).data.fromBranchId == myBranch() ||
+          get(/databases/$(database)/documents/stockTransfers/$(docId)).data.toBranchId == myBranch()
+        );
+      }
+    }
+
+    // ============================================================
+    // COMPRAS + items
+    // ============================================================
+    match /compras/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isHQ() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth() && isGerente();
+      allow delete: if isGerente();
+
+      match /items/{itemId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update, delete: if false;
+      }
+    }
+
+    // ============================================================
+    // KARDEX (movimientos) — INMUTABLE (append-only)
+    // ============================================================
+    match /movimientos/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // LEGACY — colecciones reemplazadas por v2 (cashier_sessions / journal_entries / accounts)
+    // Read-only para auditoría histórica (gerente). Escritura DENEGADA.
+    // ============================================================
+    match /turnos_caja/{docId} {
+      allow read: if isGerente();
+      allow write: if false;
+    }
+    match /movimientos_caja/{docId} {
+      allow read: if isGerente();
+      allow write: if false;
+    }
+    match /cash_branch_locks/{branchId} {
+      allow read: if isGerente();
+      allow write: if false;
+    }
+
+    // ============================================================
+    // CAJA + TESORERÍA v2
+    // ============================================================
+
+    // ACCOUNTS — cuentas (cajón físico, banco, wallet)
+    // Lectura: autenticado (los selectores la necesitan).
+    // Crear: solo GERENTE.
+    // Update: dos rutas (Firestore las combina con OR).
+    //  (a) Movimiento de saldo: cualquier usuario autenticado de la sucursal (o gerente)
+    //      puede mutar SOLO `currentBalance`, manteniendo identidad + metadata inalteradas.
+    //      El movimiento debe acompañarse de un `journal_entries` correlacionado en la
+    //      misma transacción cliente (las reglas no enforcean atomicidad cross-collection,
+    //      pero los servicios usan `runTransaction` para garantizarlo).
+    //  (b) Edición de metadata (nombre, isActive, descripción): solo GERENTE, y
+    //      `currentBalance` debe permanecer inalterado.
+    match /accounts/{accountId} {
+      allow read: if isAuth();
+      allow create: if isGerente();
+      // (a) Movimiento de saldo — cualquier campo de identidad/metadata permanece igual.
+      // Las cuentas compartidas (QR/banco) tienen branchId == null y deben poder ser
+      // actualizadas por cualquier usuario autenticado (el conteo de metadata las protege).
+      allow update: if isAuth()
+        && (isGerente() 
+            || isMyBranch(resource.data.branchId) 
+            || (resource.data.keys().hasAll(['branchIds']) && request.auth.token.branchId in resource.data.branchIds)
+            || resource.data.branchId == null)
+        && request.resource.data.openingBalance == resource.data.openingBalance
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.branchId == resource.data.branchId
+        && (!request.resource.data.keys().hasAll(['branchIds']) || request.resource.data.branchIds == resource.data.branchIds)
+        && request.resource.data.isActive == resource.data.isActive
+        && request.resource.data.name == resource.data.name;
+      // (b) Edición de metadata — solo GERENTE; balance permanece igual.
+      //     GERENTE puede reasignar sucursal (branchId/branchIds) y cambiar nombre, isActive, etc.
+      allow update: if isGerente()
+        && request.resource.data.currentBalance == resource.data.currentBalance
+        && request.resource.data.openingBalance == resource.data.openingBalance
+        && request.resource.data.type == resource.data.type;
+      allow delete: if false; // se desactiva, no se borra
+    }
+
+    // CASHIER_SESSIONS — sesiones de cajero (reemplaza turnos_caja)
+    // Lectura: gerente todo, cajero solo las suyas, cualquiera de su sucursal lee si misma branch.
+    // Crear: el cajero crea la suya (cashierId == auth.uid).
+    // Update: el cajero dueño cierra la suya; gerente puede force-close/reopen.
+    // Campos de apertura (openingTotal, openingDenominations, openedAt, cashDrawerId,
+    // cashierId, branchId) son INMUTABLES tras crearse.
+    match /cashier_sessions/{sessionId} {
+      allow read: if isAuth() && (
+        isGerente() ||
+        resource.data.cashierId == request.auth.uid ||
+        isMyBranch(resource.data.branchId)
+      );
+      allow create: if isAuth()
+        && request.resource.data.cashierId == request.auth.uid
+        && request.resource.data.status == 'OPEN';
+      allow update: if isAuth()
+        // identidad de la sesión inmutable
+        && request.resource.data.cashierId == resource.data.cashierId
+        && request.resource.data.cashDrawerId == resource.data.cashDrawerId
+        && request.resource.data.branchId == resource.data.branchId
+        && request.resource.data.openingTotal == resource.data.openingTotal
+        && request.resource.data.openingDenominations == resource.data.openingDenominations
+        && request.resource.data.openedAt == resource.data.openedAt
+        && (
+          isGerente() || hasPerm('cashier:force') ||
+          (resource.data.cashierId == request.auth.uid
+           && resource.data.status == 'OPEN')
+        );
+      allow delete: if false;
+    }
+
+    // JOURNAL_ENTRIES — asientos contables (reemplaza movimientos_caja)
+    // INMUTABLES (append-only). Solo se reconcilian (campos específicos) o se marcan como reversados.
+    // Crear: autenticado de la sucursal del asiento (o gerente). Campos críticos validados.
+    // Update: solo gerente, identidad/contenido del asiento es INMUTABLE.
+    match /journal_entries/{entryId} {
+      // El cajero/usuario que creó el asiento siempre puede leerlo (necesario para resumen de su propia sesión,
+      // ya que algunos traslados pueden tener branchId de otra sucursal — ej. bóveda HQ).
+      allow read: if isAuth() && (
+        isGerente() ||
+        resource.data.userId == request.auth.uid ||
+        isMyBranch(resource.data.branchId)
+      );
+      allow create: if isAuth()
+        && (isGerente() || isMyBranch(request.resource.data.branchId))
+        && request.resource.data.amount > 0
+        && request.resource.data.direction in ['DEBIT', 'CREDIT']
+        && request.resource.data.accountId is string
+        && request.resource.data.category is string
+        && request.resource.data.paymentMethod is string
+        && request.resource.data.userId == request.auth.uid;
+      // Update solo gerente y solo campos de reconciliación o reversión.
+      // Identidad y contenido del asiento son INMUTABLES.
+      allow update: if isAuth() && isGerente()
+        && request.resource.data.accountId == resource.data.accountId
+        && request.resource.data.amount == resource.data.amount
+        && request.resource.data.direction == resource.data.direction
+        && request.resource.data.category == resource.data.category
+        && request.resource.data.paymentMethod == resource.data.paymentMethod
+        && request.resource.data.branchId == resource.data.branchId
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.sessionId == resource.data.sessionId
+        && request.resource.data.referenceType == resource.data.referenceType
+        && request.resource.data.referenceId == resource.data.referenceId;
+      allow delete: if false;
+    }
+
+    // BANK_RECONCILIATION_BATCHES — lotes de conciliación bancaria
+    match /bank_reconciliation_batches/{batchId} {
+      allow read: if isAuth() && isGerente();
+      allow create, update: if isAuth() && isGerente();
+      allow delete: if false;
+    }
+
+    // TREASURY_CONFIG — configuración global (doc id = 'global')
+    // Solo GERENTE puede crear/editar. El auto-seed inicial debe hacerlo Cloud Function o GERENTE manualmente.
+    match /treasury_config/{docId} {
+      allow read: if isAuth();
+      allow create, update: if isGerente();
+      allow delete: if false;
+    }
+
+
+    // ============================================================
+    // GASTOS OPERATIVOS — Libro de Gastos (soft-void only)
+    // ============================================================
+    match /gastos_operativos/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isHQ() || isMyBranch(request.resource.data.branchId));
+      // Update:
+      //   - Gerente puede aprobar/anular/void (con branchId y amount inmutables).
+      //   - Mismo branch (cualquier rol) puede actualizar SOLO los campos de enlace
+      //     técnico cashMovementId / status / cancelReason — necesarios cuando el
+      //     servicio enlaza el asiento de tesorería o revierte ante fallo. No puede
+      //     pasar a 'VOIDED' (eso queda para gerente).
+      allow update: if isAuth()
+        && request.resource.data.branchId == resource.data.branchId
+        && request.resource.data.amount == resource.data.amount
+        && (
+          isGerente() ||
+          (
+            isMyBranch(resource.data.branchId)
+            && hasPerm('expenses:void')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cashMovementId','status','cancelReason','voidedBy','voidedByName','voidedAt','voidReason'])
+            && request.resource.data.get('status', resource.data.status) in ['ACTIVE','CANCELLED','VOIDED']
+          ) ||
+          (
+            isMyBranch(resource.data.branchId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cashMovementId','status','cancelReason'])
+            && request.resource.data.get('status', resource.data.status) in ['ACTIVE','CANCELLED']
+          )
+        );
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // CUENTAS CORRIENTES + abonos
+    // ============================================================
+    match /cuentas_corrientes/{docId} {
+      allow read: if isAuth() && (isGerente() || isMyBranch(resource.data.branchId));
+      allow create: if isAuth() && (isHQ() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth() && (isGerente() || isMyBranch(resource.data.branchId))
+        && request.resource.data.branchId == resource.data.branchId;
+      allow delete: if isGerente();
+
+      match /abonos/{abonoId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      match /pagos/{pagoId} {
+        allow read: if isAuth();
+        allow create: if isAuth();
+        allow update: if false;
+        allow delete: if false;
+      }
+    }
+
+    // ============================================================
+    // CLIENTES
+    // ============================================================
+    match /clientes/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isGerente() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth()
+        && (isGerente() || isMyBranch(resource.data.get('branchId', '')));
+      allow delete: if isGerente() || hasPerm('entities:delete');
+    }
+
+    // ============================================================
+    // PROVEEDORES (legacy — pendiente migración a empresas+cuentas)
+    // ============================================================
+    match /proveedores/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isGerente() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth()
+        && (isGerente() || isMyBranch(resource.data.get('branchId', '')));
+      allow delete: if isGerente() || hasPerm('entities:delete');
+    }
+
+    // ============================================================
+    // EMPRESAS (agrupador comercial global de proveedores)
+    // ============================================================
+    match /empresas/{docId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth();
+      allow delete: if isGerente();
+    }
+
+    // ============================================================
+    // CUENTAS DE PROVEEDOR (NIT / saldo / sucursal opcional)
+    // ============================================================
+    match /cuentas_proveedores/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isGerente() || !('branchId' in request.resource.data) || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth()
+        && (isGerente() || !('branchId' in resource.data) || isMyBranch(resource.data.get('branchId', '')));
+      allow delete: if isGerente() || hasPerm('entities:delete');
+    }
+
+    // ============================================================
+    // DEVOLUCIONES A PROVEEDORES
+    // ============================================================
+    match /devoluciones_proveedor/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isGerente() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth() && isGerente();
+      allow delete: if isGerente();
+    }
+
+    // ============================================================
+    // TRANSPORTES
+    // ============================================================
+    match /transportes/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth()
+        && (isGerente() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth()
+        && (isGerente() || isMyBranch(resource.data.get('branchId', '')));
+      allow delete: if isGerente() || hasPerm('entities:delete');
+    }
+
+    // ============================================================
+    // ROLES
+    // ============================================================
+    match /roles/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isGerente();
+    }
+
+    // ============================================================
+    // CATEGORÍAS
+    // ============================================================
+    match /categorias/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isGerente();
+    }
+
+    // ============================================================
+    // MARCAS
+    // ============================================================
+    match /marcas/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isGerente();
+    }
+
+    // ============================================================
+    // ORÍGENES (países de procedencia)
+    // ============================================================
+    match /origenes/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isGerente();
+    }
+
+    // ============================================================
+    // SUCURSALES
+    // ============================================================
+    match /branches/{docId} {
+      allow read: if isAuth();
+      allow create, delete: if isAuth() && isGerente();
+      allow update: if isAuth() && (
+        isGerente() || isMyBranch(docId)
+      );
+    }
+
+    // ============================================================
+    // APROBACIONES PENDIENTES (Centro de Gerencia)
+    //  - Anulación de venta cross-shift
+    //  - Descuento alto post-venta
+    // ============================================================
+    match /pending_void_approvals/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && (isGerente() || hasPerm('approvals:approve'));
+      allow delete: if false;
+    }
+    match /pending_discount_approvals/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && (isGerente() || hasPerm('approvals:approve'));
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // ALERTAS DE AUDITORÍA Y LOGS — append-only para todos, mutación solo gerente
+    // ============================================================
+    // Reglas de alertas/logs:
+    //  - Cualquier usuario auth puede MARCAR como leído (campos: `isRead`, `readAt`, `readBy`).
+    //    Esto soporta el botón "Visto" del campanario para todos los roles.
+    //  - Resolver/cerrar/borrar alertas → solo GERENTE.
+    function isAlertReadOnlyUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+        ['isRead','readAt','readBy']
+      );
+    }
+    match /alertas_auditoria/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && (isGerente() || hasPerm('audit:resolve') || isAlertReadOnlyUpdate());
+      allow delete: if isGerente() || hasPerm('audit:resolve');
+    }
+    match /audit_alerts/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && (isGerente() || hasPerm('audit:resolve') || isAlertReadOnlyUpdate());
+      allow delete: if isGerente() || hasPerm('audit:resolve');
+    }
+    match /logs_auditoria/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth() && (isGerente() || hasPerm('audit:resolve') || isAlertReadOnlyUpdate());
+      allow delete: if isGerente() || hasPerm('audit:resolve');
+    }
+    match /import_logs/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isGerente();
+    }
+
+    // ============================================================
+    // ADMIN LOGS — INMUTABLE
+    // ============================================================
+    match /admin_logs/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 19. CONFIGURACIÓN (config)
+    // Lectura pública para cargar logos y datos en el Login
+    // ============================================================
+    match /config/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isGerente();
+    }
+
+    // ============================================================
+    // RESÚMENES DIARIOS — siempre branch-scoped
+    // ============================================================
+    match /resumenes_diarios/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && (isHQ() || isMyBranch(request.resource.data.branchId));
+      allow update: if isAuth() && (isHQ() || isMyBranch(resource.data.branchId))
+        && request.resource.data.branchId == resource.data.branchId;
+      allow delete: if isGerente();
+    }
+
+    // ============================================================
+    // CRM — RECORDATORIOS
+    // ============================================================
+    match /recordatorios_cliente/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isGerente();
+    }
+
+    // ============================================================
+    // VENTAS PERDIDAS
+    // ============================================================
+    match /ventas_perdidas/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // PEDIDOS (Logística - solicitudes inmutables) + items
+    // Flujo: borrador → vigente → despachado / cancelado
+    // ============================================================
+    match /pedidos/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && (isHQ() || isMyBranch(request.resource.data.fromBranchId));
+      allow update: if isAuth() && (
+        isHQ() ||
+        isMyBranch(resource.data.fromBranchId) ||
+        isMyBranch(resource.data.toBranchId)
+      ) && (
+        // Campos sensibles del flujo de cancelación: solo GERENTE (o rol con permiso) puede tocarlos
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'cancellationPending','cancellationRequestedBy','cancellationRequestedByName',
+          'cancellationRequestedAt','cancellationReason','cancelledBy','cancelledByName',
+          'cancelledAt','cancellationRejectedBy','cancellationRejectedByName',
+          'cancellationRejectedAt','cancellationRejectionReason'
+        ]) || isGerente() || hasPerm('cancellations:approve')
+      );
+      // Inmutables: nunca se borran (solo se cancelan).
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if isAuth();
+        // Usamos getAfter() para que las escrituras batched que crean el pedido + items
+        // en la misma operación pasen la validación (get() leería el estado pre-batch
+        // donde el padre aún no existe → permission-denied).
+        allow write: if isAuth() && (
+          isHQ() ||
+          getAfter(/databases/$(database)/documents/pedidos/$(docId)).data.fromBranchId == myBranch() ||
+          getAfter(/databases/$(database)/documents/pedidos/$(docId)).data.toBranchId == myBranch()
+        ) && (
+          // Solo modificables si pedido está activo (no despachado/cancelado)
+          !(getAfter(/databases/$(database)/documents/pedidos/$(docId)).data.status in ['despachado','cancelado'])
+          || isGerente()
+        );
+      }
+    }
+
+    // ============================================================
+    // ENVÍOS (Logística - despacho/recepción) + items
+    // Flujo: preparacion → en_transito → recibido
+    // En envíos: fromBranchId = sucursal despachadora; toBranchId = receptora.
+    // ============================================================
+    match /envios/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && (isHQ() || isMyBranch(request.resource.data.fromBranchId));
+      allow update: if isAuth() && (
+        isHQ() ||
+        isMyBranch(resource.data.fromBranchId) ||
+        isMyBranch(resource.data.toBranchId)
+      ) && (
+        // Cancelación y discrepancias: GERENTE bypass; roles custom pueden
+        // tocar SOLO el bloque para el que tienen permiso. Evaluamos por
+        // separado porque son dos permisos distintos.
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'cancellationPending','cancellationMode','cancellationRequestedBy',
+            'cancellationRequestedByName','cancellationRequestedAt','cancellationReason',
+            'cancelledBy','cancelledByName','cancelledAt','cancellationRejectedBy',
+            'cancellationRejectedByName','cancellationRejectedAt','cancellationRejectionReason',
+            'discrepancyStatus','discrepancyResolvedBy','discrepancyResolvedByName',
+            'discrepancyResolvedAt','discrepancyResolutionNote','discrepancyItemActions'
+          ])
+        )
+        || isGerente()
+        || (
+          hasPerm('cancellations:approve')
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'discrepancyStatus','discrepancyResolvedBy','discrepancyResolvedByName',
+            'discrepancyResolvedAt','discrepancyResolutionNote','discrepancyItemActions'
+          ])
+        )
+        || (
+          hasPerm('discrepancies:resolve')
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'cancellationPending','cancellationMode','cancellationRequestedBy',
+            'cancellationRequestedByName','cancellationRequestedAt','cancellationReason',
+            'cancelledBy','cancelledByName','cancelledAt','cancellationRejectedBy',
+            'cancellationRejectedByName','cancellationRejectedAt','cancellationRejectionReason'
+          ])
+        )
+      );
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if isAuth();
+        // getAfter() para soportar batched writes (envio + items creados juntos).
+        allow write: if isAuth() && (
+          isHQ() ||
+          getAfter(/databases/$(database)/documents/envios/$(docId)).data.fromBranchId == myBranch() ||
+          getAfter(/databases/$(database)/documents/envios/$(docId)).data.toBranchId == myBranch()
+        ) && (
+          // Solo modificables si envío está en preparación o tránsito.
+          // Permitido durante la recepción (transición en_transito -> recibido)
+          (getAfter(/databases/$(database)/documents/envios/$(docId)).data.status in ['preparacion','en_transito'])
+          || (
+               exists(/databases/$(database)/documents/envios/$(docId)) && 
+               get(/databases/$(database)/documents/envios/$(docId)).data.status == 'en_transito' &&
+               getAfter(/databases/$(database)/documents/envios/$(docId)).data.status == 'recibido'
+             )
+          || isGerente()
+        );
+      }
+    }
+
+    // ============================================================
+    // COUNTERS — correlativos atómicos PED-NNNN / ENV-NNNN
+    // ============================================================
+    match /counters/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "renotech-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:erp": "npm run dev --workspace=apps/erp",
+    "dev:landing": "npm run dev --workspace=apps/landing",
+    "build:erp": "npm run build --workspace=apps/erp",
+    "build:landing": "npm run build --workspace=apps/landing",
+    "test:erp": "npm run test --workspace=apps/erp"
+  }
+}

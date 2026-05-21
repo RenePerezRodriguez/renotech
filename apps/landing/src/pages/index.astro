@@ -1,0 +1,1052 @@
+---
+// index.astro - Landing Page Oficial para renotech.lat
+---
+
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="generator" content={Astro.generator} />
+		
+		<!-- SEO Meta Tags -->
+		<title>Renotech | Sistema ERP y POS de Alta Precisión</title>
+		<meta name="description" content="Plataforma ERP y Punto de Venta (POS) diseñada para el control riguroso de inventarios multi-sucursal, arqueos de caja en tiempo real y soporte offline-first." />
+		<meta name="keywords" content="erp, pos, punto de venta, inventarios, arqueos de caja, offline, multi-sucursal, facturacion, renotech" />
+		
+		<!-- Open Graph / Facebook -->
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://renotech.lat/" />
+		<meta property="og:title" content="Renotech | Sistema ERP y POS de Alta Precisión" />
+		<meta property="og:description" content="Control industrial de inventarios, arqueos de caja multi-sucursal y soporte de ventas sin conexión." />
+		
+		<!-- Google Fonts -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+	</head>
+	<body>
+		<!-- Header -->
+		<header class="navbar">
+			<div class="container navbar-container">
+				<div class="logo">
+					<span class="logo-accent">RENO</span>TECH
+				</div>
+				<nav class="nav-links">
+					<a href="#caracteristicas" class="nav-link">Características</a>
+					<a href="#arquitectura" class="nav-link">Arquitectura</a>
+					<a href="#contacto" class="nav-link">Contacto</a>
+				</nav>
+				<div class="nav-cta">
+					<a href="https://sistema.renotech.lat" class="btn btn-ghost" id="nav-login-btn">Acceder al ERP</a>
+				</div>
+			</div>
+		</header>
+
+		<!-- Hero Section -->
+		<section class="hero-section">
+			<div class="container hero-grid">
+				<div class="hero-content">
+					<div class="badge">SUITE PRO v4.0 • CONTROL INDUSTRIAL</div>
+					<h1 class="hero-title">Sistema ERP & POS de Precisión Técnica</h1>
+					<p class="hero-description">
+						Control riguroso de inventarios multi-sucursal, arqueos de caja automatizados, facturación integrada y soporte offline nativo para operaciones ininterrumpidas.
+					</p>
+					<div class="hero-actions">
+						<a href="https://sistema.renotech.lat" class="btn btn-primary" id="hero-erp-btn">Iniciar Sesión ERP</a>
+						<a href="#contacto" class="btn btn-secondary" id="hero-demo-btn">Solicitar Demostración</a>
+					</div>
+				</div>
+				
+				<!-- Terminal Mockup -->
+				<div class="preview-container">
+					<div class="preview-header">
+						<div class="preview-dots">
+							<span class="dot red"></span>
+							<span class="dot yellow"></span>
+							<span class="dot green"></span>
+						</div>
+						<div class="preview-title">renotech-pos-terminal-v4</div>
+						<div class="preview-sync">
+							<span class="sync-indicator pulse"></span>
+							ONLINE
+						</div>
+					</div>
+					
+					<div class="preview-body">
+						<div class="preview-sidebar">
+							<div class="sb-item active">📈 POS</div>
+							<div class="sb-item">📦 Almacén</div>
+							<div class="sb-item">💰 Caja</div>
+							<div class="sb-item">👥 Clientes</div>
+							<div class="sb-item">⚙️ Config</div>
+						</div>
+						
+						<div class="preview-main">
+							<div class="metrics-row">
+								<div class="metric-card">
+									<div class="metric-label">VENTAS HOY</div>
+									<div class="metric-value">$8,450.25</div>
+								</div>
+								<div class="metric-card">
+									<div class="metric-label">SESIONES ACTIVAS</div>
+									<div class="metric-value">4 / 4</div>
+								</div>
+								<div class="metric-card">
+									<div class="metric-label">COBERTURA</div>
+									<div class="metric-value text-green">100%</div>
+								</div>
+							</div>
+							
+							<div class="table-container">
+								<div class="table-header">INVENTARIO CRÍTICO (ALERTAS)</div>
+								<table class="mock-table">
+									<thead>
+										<tr>
+											<th>PRODUCTO</th>
+											<th>SUCURSAL</th>
+											<th>STOCK</th>
+											<th>ESTADO</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td class="font-bold">Cable UTP Cat6</td>
+											<td>Central</td>
+											<td class="tabular-nums">5 m</td>
+											<td><span class="status-badge error">BAJO STOCK</span></td>
+										</tr>
+										<tr>
+											<td class="font-bold">Disco SSD 480GB</td>
+											<td>Sucursal Norte</td>
+											<td class="tabular-nums">3 u</td>
+											<td><span class="status-badge error">BAJO STOCK</span></td>
+										</tr>
+										<tr>
+											<td class="font-bold">Cámara IP Dome</td>
+											<td>Sucursal Sur</td>
+											<td class="tabular-nums">12 u</td>
+											<td><span class="status-badge warning">RE-STOCK</span></td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Features Section -->
+		<section id="caracteristicas" class="features-section">
+			<div class="container">
+				<div class="section-header">
+					<div class="badge">MÓDULOS DEL SISTEMA</div>
+					<h2>Arquitectura Completa para Gestión de Puntos de Venta</h2>
+				</div>
+				<div class="features-grid">
+					<!-- Feature 1 -->
+					<div class="feature-card">
+						<div class="feature-icon">📦</div>
+						<h3 class="feature-title">Inventarios Multi-Sucursal</h3>
+						<p class="feature-text">
+							Transferencias de stock en tránsito, recepción con control de discrepancias y catálogo maestro de productos unificado en tiempo real.
+						</p>
+					</div>
+					<!-- Feature 2 -->
+					<div class="feature-card">
+						<div class="feature-icon">💰</div>
+						<h3 class="feature-title">Arqueos e Inyecciones de Caja</h3>
+						<p class="feature-text">
+							Supervisión y control absoluto del flujo de caja. Registro riguroso de retiros, inyecciones de capital y cierre diario de turnos por sucursal.
+						</p>
+					</div>
+					<!-- Feature 3 -->
+					<div class="feature-card">
+						<div class="feature-icon">🛒</div>
+						<h3 class="feature-title">POS Avanzado y Venta de Kits</h3>
+						<p class="feature-text">
+							Venta combinada de productos en kits promocionales con descuento automático y desglose en tiempo real para control de bodega.
+						</p>
+					</div>
+					<!-- Feature 4 -->
+					<div class="feature-card">
+						<div class="feature-icon">📶</div>
+						<h3 class="feature-title">Soporte Offline Garantizado</h3>
+						<p class="feature-text">
+							Cola de transacciones offline. Registra ventas y movimientos sin conexión; el sistema sincronizará los datos en segundo plano automáticamente.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Offline Block -->
+		<section id="arquitectura" class="offline-section">
+			<div class="container offline-grid">
+				<div class="offline-content">
+					<div class="badge">CONECTIVIDAD TOTAL</div>
+					<h2 class="section-title">Sincronización Inteligente Offline-First</h2>
+					<p class="section-text">
+						Nuestra arquitectura está diseñada para mitigar caídas de conexión a Internet. Las terminales POS guardan localmente las ventas en cola y las envían automáticamente a Firebase en el momento en que se restablece la conectividad.
+					</p>
+					<ul class="offline-list">
+						<li>
+							<span class="list-bullet">✔</span>
+							<strong>Cero pérdidas de transacciones:</strong> Las ventas fallidas por red se encolan inmediatamente.
+						</li>
+						<li>
+							<span class="list-bullet">✔</span>
+							<strong>Base de datos local segura:</strong> Respaldada en el navegador de forma encriptada y optimizada.
+						</li>
+						<li>
+							<span class="list-bullet">✔</span>
+							<strong>Auditoría de sincronía:</strong> Trazabilidad del momento exacto del envío local al servidor central.
+						</li>
+					</ul>
+				</div>
+				<div class="diagram-container">
+					<div class="diagram-box">
+						<div class="node">Terminal Local (Offline)</div>
+						<div class="arrow">⬇ Venta Registrada</div>
+						<div class="node queue">Cola de Transacciones (Local Storage)</div>
+						<div class="arrow sync animate-pulse">🔄 Reconexión y Sincronía Automática</div>
+						<div class="node server">Servidor Firebase Cloud (Firestore)</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Contact Section -->
+		<section id="contacto" class="contact-section">
+			<div class="container max-w-sm">
+				<div class="section-header text-center">
+					<div class="badge">INTEGRACIÓN</div>
+					<h2>Despliega Renotech en tus Sucursales</h2>
+					<p class="section-text">Optimiza el control de tus inventarios y arqueos de caja hoy mismo.</p>
+				</div>
+				<form class="contact-form" onsubmit="event.preventDefault(); alert('Solicitud enviada. Nos pondremos en contacto a la brevedad.');">
+					<div class="form-group">
+						<label for="name">Nombre Completo</label>
+						<input type="text" id="name" required placeholder="Ej. Juan Pérez" />
+					</div>
+					<div class="form-group">
+						<label for="email">Correo Electrónico</label>
+						<input type="email" id="email" required placeholder="Ej. juan@empresa.com" />
+					</div>
+					<div class="form-group">
+						<label for="branchCount">Número de Sucursales</label>
+						<select id="branchCount">
+							<option>1 Sucursal</option>
+							<option>2 - 5 Sucursales</option>
+							<option>Más de 5 Sucursales</option>
+						</select>
+					</div>
+					<button type="submit" class="btn btn-primary btn-block" id="submit-contact-btn">Solicitar Acceso Demo</button>
+				</form>
+			</div>
+		</section>
+
+		<!-- Footer -->
+		<footer class="footer">
+			<div class="container footer-grid">
+				<div class="footer-brand">
+					<div class="logo">
+						<span class="logo-accent">RENO</span>TECH
+					</div>
+					<p class="footer-desc">Control técnico e industrial para tus puntos de venta.</p>
+				</div>
+				<div class="footer-links">
+					<h4>Legal</h4>
+					<a href="/LICENSE" class="footer-link">Licencia de Software</a>
+					<a href="/SECURITY" class="footer-link">Política de Seguridad</a>
+				</div>
+				<div class="footer-status">
+					<h4>Estado del Sistema</h4>
+					<div class="status-capsule">
+						<span class="status-dot green animate-pulse"></span>
+						<span>Todos los servicios operativos</span>
+					</div>
+				</div>
+			</div>
+			<div class="container footer-bottom">
+				<p>&copy; 2026 Renotech. Todos los derechos reservados. Software Privado y Propietario.</p>
+			</div>
+		</footer>
+	</body>
+</html>
+
+<style>
+	/* --- VARIABLES & DESIGN SYSTEM --- */
+	:root {
+		--bg-primary: #020617;
+		--bg-secondary: #0b0f19;
+		--bg-card: #111827;
+		--accent-primary: #3b82f6;
+		--accent-success: #10b981;
+		--accent-error: #ef4444;
+		--accent-warning: #f59e0b;
+		--action-primary: #eab308;
+		--action-text: #020617;
+		--text-primary: #f8fafc;
+		--text-secondary: #94a3b8;
+		--text-muted: #64748b;
+		--border-precision: rgba(255, 255, 255, 0.08);
+		
+		--font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+		--font-mono: 'JetBrains Mono', monospace;
+	}
+
+	/* --- GLOBAL RESET --- */
+	* {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	html {
+		scroll-behavior: smooth;
+		background-color: var(--bg-primary);
+		color: var(--text-primary);
+		font-family: var(--font-sans);
+		font-size: 16px;
+		line-height: 1.5;
+	}
+
+	body {
+		overflow-x: hidden;
+	}
+
+	.container {
+		width: 100%;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 1.5rem;
+	}
+
+	.max-w-sm {
+		max-width: 480px;
+	}
+
+	.text-center {
+		text-align: center;
+	}
+
+	.font-bold {
+		font-weight: 700;
+	}
+
+	.tabular-nums {
+		font-family: var(--font-mono);
+		font-variant-numeric: tabular-nums;
+	}
+
+	/* --- TYPOGRAPHY --- */
+	h1, h2, h3, h4 {
+		font-weight: 900;
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+	}
+
+	/* --- BUTTONS --- */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.75rem 1.5rem;
+		font-size: 0.875rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		text-decoration: none;
+		border-radius: 0.75rem; /* rounded-xl */
+		transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+		cursor: pointer;
+		border: 2px solid transparent;
+	}
+
+	.btn-primary {
+		background-color: var(--action-primary);
+		color: var(--action-text);
+	}
+
+	.btn-primary:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+	}
+
+	.btn-secondary {
+		background-color: var(--bg-card);
+		color: var(--text-primary);
+		border-color: var(--border-precision);
+	}
+
+	.btn-secondary:hover {
+		background-color: rgba(255, 255, 255, 0.05);
+		border-color: var(--text-secondary);
+	}
+
+	.btn-ghost {
+		background-color: transparent;
+		color: var(--text-primary);
+		border-color: var(--border-precision);
+	}
+
+	.btn-ghost:hover {
+		background-color: rgba(255, 255, 255, 0.05);
+		border-color: var(--accent-primary);
+	}
+
+	.btn-block {
+		display: flex;
+		width: 100%;
+	}
+
+	/* --- BADGES --- */
+	.badge {
+		display: inline-block;
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 700;
+		letter-spacing: 0.15em;
+		color: var(--action-primary);
+		background-color: rgba(234, 179, 8, 0.05);
+		border: 1px solid rgba(234, 179, 8, 0.15);
+		padding: 0.25rem 0.75rem;
+		border-radius: 9999px;
+		margin-bottom: 1rem;
+		width: fit-content;
+		text-transform: uppercase;
+	}
+
+	/* --- NAVBAR --- */
+	.navbar {
+		border-bottom: 1px solid var(--border-precision);
+		background-color: rgba(2, 6, 23, 0.8);
+		backdrop-filter: blur(8px);
+		position: sticky;
+		top: 0;
+		z-index: 100;
+		height: 4.5rem;
+		display: flex;
+		align-items: center;
+	}
+
+	.navbar-container {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.logo {
+		font-family: var(--font-mono);
+		font-weight: 900;
+		font-size: 1.25rem;
+		letter-spacing: -0.05em;
+	}
+
+	.logo-accent {
+		color: var(--action-primary);
+	}
+
+	.nav-links {
+		display: none;
+		gap: 2rem;
+	}
+
+	@media (min-width: 768px) {
+		.nav-links {
+			display: flex;
+		}
+	}
+
+	.nav-link {
+		color: var(--text-secondary);
+		text-decoration: none;
+		font-size: 0.875rem;
+		font-weight: 500;
+		transition: color 0.2s ease;
+	}
+
+	.nav-link:hover {
+		color: var(--text-primary);
+	}
+
+	/* --- HERO SECTION --- */
+	.hero-section {
+		padding: 5rem 0;
+		border-bottom: 1px solid var(--border-precision);
+	}
+
+	.hero-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 4rem;
+		align-items: center;
+	}
+
+	@media (min-width: 1024px) {
+		.hero-grid {
+			grid-template-columns: 1.1fr 0.9fr;
+		}
+	}
+
+	.hero-content {
+		display: flex;
+		flex-col: column;
+		flex-direction: column;
+	}
+
+	.hero-title {
+		font-size: 2.75rem;
+		line-height: 1.05;
+		margin-bottom: 1.5rem;
+		color: var(--text-primary);
+	}
+
+	@media (min-width: 768px) {
+		.hero-title {
+			font-size: 3.5rem;
+		}
+	}
+
+	.hero-description {
+		font-size: 1.125rem;
+		color: var(--text-secondary);
+		margin-bottom: 2.5rem;
+		max-width: 540px;
+	}
+
+	.hero-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1rem;
+	}
+
+	/* --- MOCKUP INTERFACE --- */
+	.preview-container {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-precision);
+		border-radius: 1.5rem; /* rounded-3xl */
+		overflow: hidden;
+		box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.5);
+	}
+
+	.preview-header {
+		background-color: var(--bg-card);
+		border-bottom: 1px solid var(--border-precision);
+		padding: 0.75rem 1.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.preview-dots {
+		display: flex;
+		gap: 0.375rem;
+	}
+
+	.dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		display: inline-block;
+	}
+
+	.dot.red { background-color: var(--accent-error); }
+	.dot.yellow { background-color: var(--accent-warning); }
+	.dot.green { background-color: var(--accent-success); }
+
+	.preview-title {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.preview-sync {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 700;
+		color: var(--accent-success);
+	}
+
+	.sync-indicator {
+		width: 0.375rem;
+		height: 0.375rem;
+		border-radius: 50%;
+		background-color: var(--accent-success);
+	}
+
+	.pulse {
+		animation: blink 2s infinite;
+	}
+
+	@keyframes blink {
+		0%, 100% { opacity: 0.4; }
+		50% { opacity: 1; }
+	}
+
+	.preview-body {
+		display: grid;
+		grid-template-columns: 80px 1fr;
+		min-height: 280px;
+	}
+
+	@media (min-width: 640px) {
+		.preview-body {
+			grid-template-columns: 120px 1fr;
+		}
+	}
+
+	.preview-sidebar {
+		background-color: rgba(0, 0, 0, 0.15);
+		border-right: 1px solid var(--border-precision);
+		padding: 1rem 0.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.sb-item {
+		padding: 0.375rem 0.5rem;
+		font-size: 0.6875rem;
+		font-weight: 700;
+		color: var(--text-secondary);
+		border-radius: 0.375rem;
+		cursor: pointer;
+	}
+
+	.sb-item.active {
+		background-color: rgba(255, 255, 255, 0.05);
+		color: var(--text-primary);
+	}
+
+	.preview-main {
+		padding: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.metrics-row {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.5rem;
+	}
+
+	.metric-card {
+		background-color: var(--bg-card);
+		border: 1px solid var(--border-precision);
+		border-radius: 0.75rem;
+		padding: 0.5rem;
+	}
+
+	.metric-label {
+		font-family: var(--font-mono);
+		font-size: 0.5rem;
+		color: var(--text-muted);
+		letter-spacing: 0.05em;
+		margin-bottom: 0.25rem;
+	}
+
+	.metric-value {
+		font-size: 0.875rem;
+		font-weight: 900;
+		color: var(--text-primary);
+	}
+
+	@media (min-width: 640px) {
+		.metric-value {
+			font-size: 1.125rem;
+		}
+	}
+
+	.text-green {
+		color: var(--accent-success);
+	}
+
+	.table-container {
+		background-color: var(--bg-card);
+		border: 1px solid var(--border-precision);
+		border-radius: 0.75rem;
+		overflow: hidden;
+	}
+
+	.table-header {
+		font-family: var(--font-mono);
+		font-size: 0.5625rem;
+		font-weight: 700;
+		color: var(--text-muted);
+		padding: 0.5rem 0.75rem;
+		background-color: rgba(0, 0, 0, 0.1);
+		border-bottom: 1px solid var(--border-precision);
+		letter-spacing: 0.05em;
+	}
+
+	.mock-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.625rem;
+		text-align: left;
+	}
+
+	@media (min-width: 640px) {
+		.mock-table {
+			font-size: 0.75rem;
+		}
+	}
+
+	.mock-table th, .mock-table td {
+		padding: 0.5rem 0.75rem;
+		border-bottom: 1px solid var(--border-precision);
+	}
+
+	.mock-table th {
+		font-family: var(--font-mono);
+		font-size: 0.5625rem;
+		color: var(--text-muted);
+		font-weight: 700;
+		background-color: rgba(0, 0, 0, 0.05);
+	}
+
+	.status-badge {
+		font-family: var(--font-mono);
+		font-size: 0.5rem;
+		font-weight: 700;
+		padding: 0.125rem 0.375rem;
+		border-radius: 0.25rem;
+	}
+
+	.status-badge.error {
+		background-color: rgba(239, 68, 68, 0.1);
+		color: var(--accent-error);
+		border: 1px solid rgba(239, 68, 68, 0.15);
+	}
+
+	.status-badge.warning {
+		background-color: rgba(245, 158, 11, 0.1);
+		color: var(--accent-warning);
+		border: 1px solid rgba(245, 158, 11, 0.15);
+	}
+
+	/* --- FEATURES SECTION --- */
+	.features-section {
+		padding: 5rem 0;
+		border-bottom: 1px solid var(--border-precision);
+		background-color: var(--bg-secondary);
+	}
+
+	.section-header {
+		margin-bottom: 3.5rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+	}
+
+	.section-header h2 {
+		font-size: 2.25rem;
+		max-width: 600px;
+	}
+
+	.features-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+
+	@media (min-width: 640px) {
+		.features-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.features-grid {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+
+	.feature-card {
+		background-color: var(--bg-card);
+		border: 1px solid var(--border-precision);
+		border-radius: 1.5rem; /* rounded-3xl */
+		padding: 2.25rem;
+		transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.feature-card:hover {
+		transform: translateY(-4px);
+		border-color: rgba(255, 255, 255, 0.15);
+	}
+
+	.feature-icon {
+		font-size: 2rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.feature-title {
+		font-size: 1.25rem;
+		margin-bottom: 0.75rem;
+		color: var(--text-primary);
+	}
+
+	.feature-text {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+	}
+
+	/* --- OFFLINE SECTION --- */
+	.offline-section {
+		padding: 5rem 0;
+		border-bottom: 1px solid var(--border-precision);
+	}
+
+	.offline-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 4rem;
+		align-items: center;
+	}
+
+	@media (min-width: 1024px) {
+		.offline-grid {
+			grid-template-columns: 1fr 1fr;
+		}
+	}
+
+	.offline-content {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.section-title {
+		font-size: 2.25rem;
+		margin-bottom: 1rem;
+	}
+
+	.section-text {
+		color: var(--text-secondary);
+		margin-bottom: 2rem;
+	}
+
+	.offline-list {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.offline-list li {
+		font-size: 0.9375rem;
+		color: var(--text-secondary);
+		display: flex;
+		gap: 0.75rem;
+		align-items: flex-start;
+	}
+
+	.list-bullet {
+		color: var(--action-primary);
+		font-weight: 700;
+	}
+
+	/* Diagram Style */
+	.diagram-container {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-precision);
+		border-radius: 1.5rem;
+		padding: 2.5rem;
+	}
+
+	.diagram-box {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+	}
+
+	.node {
+		background-color: var(--bg-card);
+		border: 1px solid var(--border-precision);
+		border-radius: 0.75rem;
+		padding: 1rem 1.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 700;
+		text-align: center;
+		width: 100%;
+		max-width: 320px;
+	}
+
+	.node.queue {
+		border-color: var(--accent-warning);
+		background-color: rgba(245, 158, 11, 0.03);
+	}
+
+	.node.server {
+		border-color: var(--accent-primary);
+		background-color: rgba(59, 130, 246, 0.03);
+	}
+
+	.arrow {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.arrow.sync {
+		color: var(--accent-success);
+		font-weight: 700;
+	}
+
+	/* --- CONTACT SECTION --- */
+	.contact-section {
+		padding: 5rem 0;
+		border-bottom: 1px solid var(--border-precision);
+		background-color: var(--bg-secondary);
+	}
+
+	.contact-form {
+		background-color: var(--bg-card);
+		border: 1px solid var(--border-precision);
+		border-radius: 1.5rem;
+		padding: 2.5rem;
+		margin-top: 2rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+		box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.form-group label {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 700;
+		letter-spacing: 0.15em;
+		text-transform: uppercase;
+		color: var(--text-secondary);
+	}
+
+	.form-group input, .form-group select {
+		background-color: var(--bg-secondary);
+		border: 1px solid var(--border-precision);
+		border-radius: 0.75rem;
+		padding: 0.75rem 1rem;
+		color: var(--text-primary);
+		font-family: var(--font-sans);
+		font-size: 0.875rem;
+		transition: all 0.2s ease;
+		width: 100%;
+		outline: none;
+	}
+
+	.form-group input:focus, .form-group select:focus {
+		border-color: var(--accent-primary);
+		box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+	}
+
+	/* --- FOOTER --- */
+	.footer {
+		padding: 5rem 0 3rem;
+		background-color: var(--bg-primary);
+	}
+
+	.footer-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 3rem;
+		margin-bottom: 4rem;
+	}
+
+	@media (min-width: 768px) {
+		.footer-grid {
+			grid-template-columns: 1.5fr 1fr 1fr;
+		}
+	}
+
+	.footer-brand {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.footer-desc {
+		font-size: 0.875rem;
+		color: var(--text-secondary);
+		max-width: 280px;
+	}
+
+	.footer-grid h4 {
+		font-family: var(--font-mono);
+		font-size: 0.625rem;
+		font-weight: 700;
+		letter-spacing: 0.15em;
+		text-transform: uppercase;
+		color: var(--text-muted);
+		margin-bottom: 1.5rem;
+	}
+
+	.footer-links {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.footer-link {
+		color: var(--text-secondary);
+		font-size: 0.875rem;
+		text-decoration: none;
+		transition: color 0.2s ease;
+	}
+
+	.footer-link:hover {
+		color: var(--text-primary);
+	}
+
+	.footer-status {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.status-capsule {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		background-color: rgba(16, 185, 129, 0.05);
+		border: 1px solid rgba(16, 185, 129, 0.15);
+		padding: 0.5rem 1rem;
+		border-radius: 0.75rem;
+		font-size: 0.75rem;
+		color: var(--accent-success);
+		font-weight: 600;
+		width: fit-content;
+	}
+
+	.status-dot {
+		width: 0.5rem;
+		height: 0.5rem;
+		border-radius: 50%;
+		background-color: var(--accent-success);
+	}
+
+	.footer-bottom {
+		border-top: 1px solid var(--border-precision);
+		padding-top: 2rem;
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+</style>

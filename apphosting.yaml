@@ -1,0 +1,17 @@
+kind: "AppHostingYaml"
+version: "v1"
+
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  concurrency: 40
+
+# Environment variables and secrets.
+env:
+  # Grant access to secrets in Cloud Secret Manager.
+  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+  - variable: FIREBASE_SERVICE_ACCOUNT_KEY
+    secret: FIREBASE_SERVICE_ACCOUNT_KEY
+  - variable: DEEPSEEK_API_KEY
+    secret: DEEPSEEK_API_KEY

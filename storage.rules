@@ -1,0 +1,116 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ============================================================
+    // 🛡️ FUNCIONES AUXILIARES
+    // Architecture: infrastructure_and_security.md §1
+    // ============================================================
+
+    // Verifica autenticación
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Obtiene datos del usuario desde Firestore
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Verifica rol GERENTE
+    function isGerente() {
+      return isAuthenticated() && getUserData().role == 'GERENTE';
+    }
+
+    // Valida tamaño máximo de archivo (10 MB)
+    function isValidFileSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+
+    // Valida tipos de imagen permitidos
+    function isImageFile() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    // Valida tipos de documento permitidos
+    function isDocumentFile() {
+      return request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'text/csv'
+          || request.resource.contentType.matches('application/vnd.*');
+    }
+
+    // ============================================================
+    // 1. IMÁGENES DE PRODUCTOS (/products/)
+    // Lectura: Pública | Escritura: Usuarios autenticados activos
+    // ============================================================
+    match /products/{allPaths=**} {
+      allow read: if true; // Lectura pública para catálogo
+      allow write: if isAuthenticated()
+                   && isImageFile()
+                   && isValidFileSize();
+    }
+
+    // ============================================================
+    // 2. DOCUMENTOS DE CLIENTES (/clients/)
+    // Solo Gerencia y Admin
+    // ============================================================
+    match /clients/{clientId}/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && (isGerente() || request.auth.uid == clientId)
+                   && isDocumentFile()
+                   && isValidFileSize();
+    }
+
+    // ============================================================
+    // 3. BACKUPS (/backups/)
+    // Solo Super-Admin (GERENTE)
+    // ============================================================
+    match /backups/{allPaths=**} {
+      allow read: if isGerente();
+      allow write: if isGerente()
+                   && isDocumentFile();
+    }
+
+    // ============================================================
+    // 4. ARCHIVOS TEMPORALES (/temp/)
+    // Usuarios autenticados (importaciones Excel, etc.)
+    // ============================================================
+    match /temp/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+                   && isValidFileSize();
+      allow delete: if isAuthenticated();
+    }
+
+    // ============================================================
+    // 5. LOGOS Y BRANDING DE SUCURSALES (/branches/)
+    // Solo GERENTE
+    // ============================================================
+    match /branches/{branchId}/{allPaths=**} {
+      allow read: if true; // Público para mostrar logos
+      allow write: if isGerente()
+                   && isImageFile()
+                   && isValidFileSize();
+    }
+
+    // ============================================================
+    // 6. QR DE COBRO (/qr/)
+    // Lectura pública (mostrado en recibos) | Escritura: GERENTE
+    // ============================================================
+    match /qr/{allPaths=**} {
+      allow read: if true;
+      allow write: if isGerente()
+                   && isImageFile()
+                   && isValidFileSize();
+    }
+
+    // ============================================================
+    // REGLA POR DEFECTO: Denegar todo lo no especificado
+    // ============================================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
