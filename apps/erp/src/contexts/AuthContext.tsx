@@ -249,6 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [role, allowedRoutes, realRole, loading]);
 
     const logout = async () => {
+        sessionStorage.removeItem('rnt_has_session');
         await signOut(auth);
         setRole(null);
         setUserName(null);

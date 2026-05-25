@@ -1,0 +1,7 @@
+kind: "AppHostingYaml"
+version: "v1"
+
+# Configuración básica para el backend de la landing (Cloud Run).
+runConfig:
+  minInstances: 0
+  concurrency: 80

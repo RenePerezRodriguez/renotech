@@ -63,6 +63,7 @@ export default function CajaPage() {
     const { user, userName, role } = useAuth();
     const { currentBranch, isConsolidatedView } = useBranch();
     const isGerente = role === 'GERENTE';
+    const canViewHistory = isGerente || role === 'ENCARGADO_VENTAS';
     const [tab, setTab] = useState<Tab>('MY_CASH');
 
     if (!isOnline) return <CajaOfflineView />;
@@ -89,7 +90,7 @@ export default function CajaPage() {
         { id: 'TRANSFERS', label: 'Transferencias', icon: <History size={14} />, show: true },
         { id: 'OPEN_SESSIONS', label: 'Sesiones activas', icon: <Users size={14} />, show: isGerente },
         // OBS-03: historial y ajustes son solo para gerencia
-        { id: 'HISTORY', label: 'Historial', icon: <History size={14} />, show: isGerente },
+        { id: 'HISTORY', label: 'Historial', icon: <History size={14} />, show: canViewHistory },
         { id: 'SETTINGS', label: 'Ajustes', icon: <Settings size={14} />, show: isGerente },
     ];
 

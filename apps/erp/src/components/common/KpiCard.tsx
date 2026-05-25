@@ -38,6 +38,16 @@ export default function KpiCard({
     const isRed = color === 'red';
     const isPurple = color === 'purple';
 
+    const [animationDone, setAnimationDone] = React.useState(false);
+
+    React.useEffect(() => {
+        if (delay === undefined) return;
+        const timer = setTimeout(() => {
+            setAnimationDone(true);
+        }, delay + 600);
+        return () => clearTimeout(timer);
+    }, [delay]);
+
     return (
         <div
             className={clsx(
@@ -47,7 +57,7 @@ export default function KpiCard({
                     : "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md",
                 highlight && "ring-1 ring-yellow-500/20"
             )}
-            style={delay !== undefined ? {
+            style={(delay !== undefined && !animationDone) ? {
                 animation: `card-enter 0.55s cubic-bezier(0.22,1,0.36,1) ${delay}ms backwards`
             } : undefined}
         >

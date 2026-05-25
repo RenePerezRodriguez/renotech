@@ -322,8 +322,13 @@ const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
                                 <Text style={styles.cajeroDetail}>Sucursal: {config.branchName}</Text>
                             )}
                             <Text style={styles.cajeroDetail}>Cajón Físico ID: #{session.cashDrawerId.slice(0, 12).toUpperCase()}</Text>
-                            {session.closedByName && (
-                                <Text style={styles.cajeroDetail}>Cerrado por: {formatUserName(session.closedByName)} ({session.closedByRole})</Text>
+                            
+                            <Text style={[styles.labelHeader, { marginTop: 8 }]}>Cerrado Por</Text>
+                            <Text style={styles.cajeroName}>
+                                {session.closedByName ? formatUserName(session.closedByName) : formatUserName(session.cashierName)}
+                            </Text>
+                            {session.closedByName && session.closedByRole && (
+                                <Text style={styles.cajeroDetail}>Rol: {session.closedByRole}</Text>
                             )}
                         </View>
 

@@ -43,7 +43,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         }
     }, [user, loading, router]);
 
-    if (loading) {
+    const hasSession = typeof window !== 'undefined' && !!sessionStorage.getItem('rnt_has_session');
+
+    if (loading && !hasSession) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-[#020617]">
                 <div className="flex flex-col items-center gap-4">

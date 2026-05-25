@@ -6,7 +6,7 @@ import { CashierSessionService } from '@/services/CashierSessionService';
 import { AccountService } from '@/services/AccountService';
 import { Sale } from '@/types';
 import { CashierSession } from '@/types/treasury';
-import { useProducts } from '@/hooks/useProducts';
+import { useProductStore } from '@/store/productStore';
 import { ensureDate, formatTime } from '@/utils/dateHelpers';
 import {
     DollarSign,
@@ -49,7 +49,8 @@ export default function DashboardPage() {
     const [topProducts, setTopProducts] = useState<{ id: string, name: string, qty: number, total: number }[]>([]);
 
     const { currentBranch, isConsolidatedView, loading: branchLoading } = useBranch();
-    const { products, loading: productsLoading } = useProducts();
+    const products = useProductStore(s => s.products);
+    const productsLoading = useProductStore(s => s.loading);
     const [globalCashTotal, setGlobalCashTotal] = useState(0);
 
     useEffect(() => {
@@ -57,34 +58,34 @@ export default function DashboardPage() {
 
         const fetchDashboardData = async () => {
             try {
-                // Determine branch filter
                 const branchFilter = isConsolidatedView ? undefined : currentBranch?.id;
 
-                // 1. Get today's range
                 const startOfDay = new Date();
                 startOfDay.setHours(0, 0, 0, 0);
                 const endOfDay = new Date();
                 endOfDay.setHours(23, 59, 59, 999);
-
-                // 2. Fetch Today's Sales
-                const todaySales = await SaleService.getSalesByDateRange(startOfDay, endOfDay, branchFilter);
-                const totalAmount = todaySales.reduce((acc, sale) => acc + (sale.total || 0), 0);
-                setTodaySalesTotal(totalAmount);
-                setTodaySalesCount(todaySales.length);
-
-                // 3. Fetch Recent Sales
-                const recent = await SaleService.getRecentSales(5, branchFilter);
-                setRecentSales(recent);
-
-                // 4. Top Products (últimos 7 días) y Chart Data
-                // Reutilizamos una sola query semanal para ambos widgets
                 const startOfWeek = new Date();
                 startOfWeek.setDate(startOfWeek.getDate() - 6);
                 startOfWeek.setHours(0, 0, 0, 0);
-                
-                const weeklySales = await SaleService.getSalesByDateRange(startOfWeek, new Date(), branchFilter);
 
-                // Top Products de la semana
+                const cashPromise: Promise<CashierSession[] | CashierSession | null> = isConsolidatedView
+                    ? CashierSessionService.getOpenSessions()
+                    : user?.uid
+                        ? CashierSessionService.getOperableSession(user.uid, currentBranch?.id)
+                        : Promise.resolve(null);
+
+                const [todaySales, recent, weeklySales, cashResult] = await Promise.all([
+                    SaleService.getSalesByDateRange(startOfDay, endOfDay, branchFilter),
+                    SaleService.getRecentSales(5, branchFilter),
+                    SaleService.getSalesByDateRange(startOfWeek, new Date(), branchFilter),
+                    cashPromise,
+                ]);
+
+                const totalAmount = todaySales.reduce((acc, sale) => acc + (sale.total || 0), 0);
+                setTodaySalesTotal(totalAmount);
+                setTodaySalesCount(todaySales.length);
+                setRecentSales(recent);
+
                 const productStats: Record<string, { id: string, name: string, qty: number, total: number }> = {};
                 weeklySales.forEach(sale => {
                     if (sale.items) {
@@ -97,39 +98,32 @@ export default function DashboardPage() {
                         });
                     }
                 });
-                const top = Object.values(productStats).sort((a, b) => b.qty - a.qty).slice(0, 5);
-                setTopProducts(top);
+                setTopProducts(Object.values(productStats).sort((a, b) => b.qty - a.qty).slice(0, 5));
 
-                // Chart data semanal
                 const data: ChartData[] = [];
                 for (let i = 6; i >= 0; i--) {
                     const day = new Date();
                     day.setDate(day.getDate() - i);
                     const dayLabel = day.toLocaleDateString('es-BO', { weekday: 'short' });
-                    
                     const dayTotal = weeklySales.filter(s => {
                         const sDate = ensureDate(s.fecha);
-                        return sDate.getDate() === day.getDate() && 
-                               sDate.getMonth() === day.getMonth() && 
+                        return sDate.getDate() === day.getDate() &&
+                               sDate.getMonth() === day.getMonth() &&
                                sDate.getFullYear() === day.getFullYear();
                     }).reduce((acc, s) => acc + (s.total ?? 0), 0);
-                    
                     data.push({ name: dayLabel, total: dayTotal });
                 }
                 setChartData(data);
 
-                // 4. Cash Status
                 if (isConsolidatedView) {
-                    const allSessions = await CashierSessionService.getOpenSessions();
-                    let totalBalance = 0;
-                    for (const s of allSessions) {
-                        const acc = await AccountService.getById(s.cashDrawerId);
-                        totalBalance += acc?.currentBalance ?? 0;
-                    }
-                    setGlobalCashTotal(totalBalance);
+                    const allSessions = cashResult as CashierSession[];
+                    const balances = await Promise.all(
+                        allSessions.map(s => AccountService.getById(s.cashDrawerId))
+                    );
+                    setGlobalCashTotal(balances.reduce((sum, acc) => sum + (acc?.currentBalance ?? 0), 0));
                     setCurrentShift(allSessions.length > 0 ? allSessions[0] : null);
-                } else if (user?.uid) {
-                    const validSession = await CashierSessionService.getOperableSession(user.uid, currentBranch?.id);
+                } else {
+                    const validSession = cashResult as CashierSession | null;
                     setCurrentShift(validSession);
                     if (validSession) {
                         const acc = await AccountService.getById(validSession.cashDrawerId);
@@ -139,16 +133,15 @@ export default function DashboardPage() {
                     }
                 }
 
-                // 5. Audit access to dashboard
                 if (user && currentBranch?.id) {
-                    await logAdminAction(
+                    logAdminAction(
                         user.uid,
                         user.email || '?',
                         'VIEW_DASHBOARD',
                         isConsolidatedView ? 'CONSOLIDATED' : currentBranch.id,
                         currentBranch.id,
                         isConsolidatedView ? 'Vista Global Consolidada' : `Vista de Sucursal: ${currentBranch.name}`
-                    );
+                    ).catch(() => {});
                 }
             } catch (error) {
                 console.error("Dashboard error:", error);
@@ -177,6 +170,7 @@ export default function DashboardPage() {
     return (
         <div className="flex-1 min-w-0 w-full max-w-full flex flex-col space-y-4 sm:space-y-6 lg:space-y-8 pb-6 sm:pb-10 animate-in fade-in duration-500">
             {/* Header Section */}
+            <div data-tour="inicio-header">
 
             <ModuleHeader
                 title="Dashboard"
@@ -195,30 +189,33 @@ export default function DashboardPage() {
                 ] : []}
             />
 
-            {/* Quick Actions Tooltip Style */}
-            <div className="flex flex-wrap gap-2 sm:gap-4">
-                {canAccess('/punto-de-venta') && (
-                    <Link href="/punto-de-venta" style={{ animation: 'page-enter 0.4s cubic-bezier(0.22,1,0.36,1) 0ms backwards' }} className="flex flex-1 min-w-[min(100%,10rem)] sm:flex-none items-center justify-center gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-yellow-500 hover:bg-yellow-600 text-black rounded-xl font-bold text-sm shadow-lg shadow-yellow-500/10 transition-all active:scale-95 group">
-                        <ShoppingBag size={20} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
-                        Nueva Venta
-                    </Link>
-                )}
-                {[
-                    { href: '/caja', icon: DollarSign, label: 'Bóveda' },
-                    { href: '/inventario', icon: Package, label: 'Inventario' },
-                    { href: '/compras', icon: TrendingUp, label: 'Compras' }
-                ].filter(action => canAccess(action.href)).map((action, i) => (
-                    <Link key={action.href} href={action.href} style={{ animation: `page-enter 0.4s cubic-bezier(0.22,1,0.36,1) ${(i + 1) * 80}ms backwards` }} className="flex flex-1 min-w-[min(100%,10rem)] sm:flex-none items-center justify-center gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white dark:bg-background border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm hover:border-yellow-500 transition-all active:scale-95 group shadow-sm">
-                        <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-yellow-500 transition-colors">
-                            <action.icon size={18} />
-                        </div>
-                        {action.label}
-                    </Link>
-                ))}
+            {/* Quick actions strip */}
+            <div className="mt-4 rounded-3xl border border-slate-200/60 dark:border-white/10 bg-white dark:bg-background shadow-sm p-3 sm:p-4">
+                <div className="flex flex-wrap gap-3 sm:gap-4">
+                    {canAccess('/punto-de-venta') && (
+                        <Link href="/punto-de-venta" style={{ animation: 'page-enter 0.4s cubic-bezier(0.22,1,0.36,1) 0ms backwards' }} className="flex flex-1 min-w-[min(100%,10rem)] sm:flex-none items-center justify-center gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-yellow-500 hover:bg-yellow-600 text-black rounded-xl font-bold text-sm shadow-lg shadow-yellow-500/10 transition-all active:scale-95 group">
+                            <ShoppingBag size={20} strokeWidth={2.5} className="group-hover:scale-110 transition-transform" />
+                            Nueva Venta
+                        </Link>
+                    )}
+                    {[
+                        { href: '/caja', icon: DollarSign, label: 'Bóveda' },
+                        { href: '/inventario', icon: Package, label: 'Inventario' },
+                        { href: '/compras', icon: TrendingUp, label: 'Compras' }
+                    ].filter(action => canAccess(action.href)).map((action, i) => (
+                        <Link key={action.href} href={action.href} style={{ animation: `page-enter 0.4s cubic-bezier(0.22,1,0.36,1) ${(i + 1) * 80}ms backwards` }} className="flex flex-1 min-w-[min(100%,10rem)] sm:flex-none items-center justify-center gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-white dark:bg-background border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm hover:border-yellow-500 transition-all active:scale-95 group shadow-sm">
+                            <div className="w-8 h-8 rounded-xl bg-slate-50 dark:bg-white/5 flex items-center justify-center text-slate-400 group-hover:text-yellow-500 transition-colors">
+                                <action.icon size={18} />
+                            </div>
+                            {action.label}
+                        </Link>
+                    ))}
+                </div>
+            </div>
             </div>
 
             {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div data-tour="inicio-kpis" className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <KpiCard
                     label="Ingresos del Día"
                     value={`Bs. ${(todaySalesTotal ?? 0).toLocaleString()}`}
@@ -249,14 +246,16 @@ export default function DashboardPage() {
             </div>
 
             {/* Posición financiera: Bóveda / Por Pagar / A Favor */}
-            <FinancialOverview
-                cashBalance={isConsolidatedView ? globalCashTotal : (currentShift ? cashBalance : null)}
-                isConsolidatedView={isConsolidatedView || !!currentBranch?.isHQ}
-                currentBranchId={isConsolidatedView || currentBranch?.isHQ ? undefined : currentBranch?.id}
-            />
+            <div data-tour="inicio-financial">
+                <FinancialOverview
+                    cashBalance={isConsolidatedView ? globalCashTotal : (currentShift ? cashBalance : null)}
+                    isConsolidatedView={isConsolidatedView || !!currentBranch?.isHQ}
+                    currentBranchId={isConsolidatedView || currentBranch?.isHQ ? undefined : currentBranch?.id}
+                />
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Chart Section */}
-                <div className="lg:col-span-2 bg-white dark:bg-background rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-white/10 p-4 sm:p-8 shadow-xl flex flex-col min-w-0">
+                <div data-tour="inicio-chart" className="lg:col-span-2 bg-white dark:bg-background rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-white/10 p-4 sm:p-8 shadow-xl flex flex-col min-w-0">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-8 min-w-0">
                         <div>
                             <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -280,7 +279,7 @@ export default function DashboardPage() {
                     <UpcomingReminders branchId={isConsolidatedView ? 'ALL' : (currentBranch?.id || 'ALL')} />
 
                     {/* Activity List */}
-                    <div className="bg-white dark:bg-background rounded-3xl border border-slate-200 dark:border-white/10 shadow-xl overflow-hidden flex flex-col h-full">
+                    <div data-tour="inicio-activity" className="bg-white dark:bg-background rounded-3xl border border-slate-200 dark:border-white/10 shadow-xl overflow-hidden flex flex-col h-full">
                         <div className="p-6 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-black/40">
                             <h2 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Actividad Reciente</h2>
                             <Link href="/ventas" className="text-[9px] font-black text-yellow-600 dark:text-[#FFD700] uppercase tracking-widest hover:underline">Ver Todo</Link>
@@ -306,7 +305,7 @@ export default function DashboardPage() {
                     </div>
  
                     {/* Top Products */}
-                    <div className="bg-white dark:bg-background rounded-3xl border border-slate-200 dark:border-white/10 p-8 shadow-xl">
+                    <div data-tour="inicio-top-products" className="bg-white dark:bg-background rounded-3xl border border-slate-200 dark:border-white/10 p-8 shadow-xl">
                         <h2 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Top Productos</h2>
                         {topProducts.length === 0 ? (
                             <p className="text-[10px] text-slate-400 font-bold">Sin ventas en los últimos 7 días</p>

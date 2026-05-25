@@ -2,25 +2,24 @@
 
 import type { TourDefinition, TourStep } from './definitions';
 import { TOUR_DEFINITIONS } from './definitions';
+import 'driver.js/dist/driver.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TourState {
   tourId: string;
   stepIndex: number;
-  practiceMode: boolean;
   timestamp: number;
 }
 
 export interface TourOptions {
-  practiceMode?: boolean;
   startStep?: number;
   voice?: boolean;
   onComplete?: () => void;
   onSkip?: () => void;
 }
 
-type NavigateFn = (route: string) => void;
+type NavigateFn = (route: string) => Promise<void> | void;
 
 // ─── Local storage ────────────────────────────────────────────────────────────
 
@@ -38,7 +37,6 @@ function loadState(): TourState | null {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as TourState;
-    // Discard state older than 24 hours
     if (Date.now() - s.timestamp > 86_400_000) { localStorage.removeItem(LS_KEY); return null; }
     return s;
   } catch { return null; }
@@ -60,27 +58,6 @@ function narrate(text: string) {
 function stopNarration() {
   if (typeof window === 'undefined') return;
   window.speechSynthesis?.cancel();
-}
-
-// ─── Practice mode banner ─────────────────────────────────────────────────────
-
-function showPracticeBanner() {
-  const existing = document.getElementById('__tour_practice_banner');
-  if (existing) return;
-  const el = document.createElement('div');
-  el.id = '__tour_practice_banner';
-  el.style.cssText = `
-    position: fixed; top: 0; left: 0; right: 0; z-index: 10001;
-    background: #f59e0b; color: #000; font-size: 12px; font-weight: 700;
-    text-align: center; padding: 6px 12px; letter-spacing: 0.05em;
-    text-transform: uppercase; pointer-events: none;
-  `;
-  el.textContent = '⚠️  MODO PRÁCTICA — Esta guía es interactiva. No se realizarán cambios reales.';
-  document.body.appendChild(el);
-}
-
-function hidePracticeBanner() {
-  document.getElementById('__tour_practice_banner')?.remove();
 }
 
 // ─── Branch overlay ───────────────────────────────────────────────────────────
@@ -144,24 +121,85 @@ function showBranchOverlay(
   document.body.appendChild(overlay);
 }
 
+// Helper to look back and find the expected route for a specific step index
+function getExpectedRoute(def: TourDefinition, stepIndex: number): string {
+  for (let i = stepIndex; i >= 0; i--) {
+    if (def.steps[i]?.route) {
+      return def.steps[i].route!;
+    }
+  }
+  return def.startRoute;
+}
+
+// Helper to poll for an exact route match after navigation
+function waitForRoute(route: string, timeout = 3000): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if (window.location.pathname === route) return resolve(true);
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      if (window.location.pathname === route) {
+        clearInterval(interval);
+        resolve(true);
+      } else if (Date.now() - startTime > timeout) {
+        clearInterval(interval);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
+async function navigateToRoute(navigate: NavigateFn, route: string) {
+  if (!navigate) return;
+  await navigate(route);
+  await waitForRoute(route, 2500);
+}
+
+// Helper to poll for element presence before driver initializes
+function waitForElement(selector: string, timeout = 3000): Promise<Element | null> {
+  return new Promise((resolve) => {
+    const el = document.querySelector(selector);
+    if (el) return resolve(el);
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const el = document.querySelector(selector);
+      if (el) {
+        clearInterval(interval);
+        resolve(el);
+      } else if (Date.now() - startTime > timeout) {
+        clearInterval(interval);
+        resolve(null);
+      }
+    }, 100);
+  });
+}
+
 // ─── Tour Engine ──────────────────────────────────────────────────────────────
 
 class TourEngine {
   private navigate: NavigateFn = () => {};
   private currentDriver: ReturnType<typeof import('driver.js').driver> | null = null;
   private voiceEnabled = false;
+  private pendingResume: { tourId: string; stepIndex: number; timestamp: number } | null = null;
 
   setNavigate(fn: NavigateFn) { this.navigate = fn; }
   setVoice(enabled: boolean) { this.voiceEnabled = enabled; }
 
   getSavedState(): TourState | null { return loadState(); }
 
+  consumePendingResume(): { tourId: string; stepIndex: number; timestamp: number } | null {
+    const s = this.pendingResume;
+    this.pendingResume = null;
+    return s;
+  }
+
   async startTour(tourId: string, options: TourOptions = {}) {
     const def = TOUR_DEFINITIONS[tourId];
     if (!def) { console.warn(`[Tour] Unknown tour: ${tourId}`); return; }
 
     const {
-      practiceMode = false,
       startStep = 0,
       voice = this.voiceEnabled,
       onComplete,
@@ -171,42 +209,76 @@ class TourEngine {
     // Handle branching on first step
     const firstStep = def.steps[0];
     if (firstStep?.branch && startStep === 0) {
-      this.navigate(def.startRoute);
-      await new Promise<void>(r => setTimeout(r, 350));
+      if (def.startRoute) {
+        await navigateToRoute(this.navigate, def.startRoute);
+      }
       showBranchOverlay(
         firstStep.branch,
-        (branchTourId) => this.startTour(branchTourId, { practiceMode, voice, onComplete, onSkip }),
+        (branchTourId) => this.startTour(branchTourId, { voice, onComplete, onSkip }),
         () => { saveState(null); onSkip?.(); }
       );
       return;
     }
 
-    // Navigate to starting route
-    if (def.startRoute) {
-      this.navigate(def.startRoute);
-      await new Promise<void>(r => setTimeout(r, 450));
+    // Determine the expected route for this step index
+    const expectedRoute = getExpectedRoute(def, startStep);
+    
+    // Only navigate if we are not already there
+    if (typeof window !== 'undefined' && window.location.pathname !== expectedRoute) {
+      await navigateToRoute(this.navigate, expectedRoute);
+    } else if (startStep === 0 && def.startRoute && typeof window !== 'undefined' && window.location.pathname !== def.startRoute) {
+      await navigateToRoute(this.navigate, def.startRoute);
     }
 
-    if (practiceMode) showPracticeBanner();
+    const steps = def.steps.filter((_, i) => i >= startStep);
+    if (steps.length === 0) return;
+
+    // Wait for the first targeted element to exist in the DOM (if specified) before triggering driver.js
+    const firstStepEl = steps[0].element;
+    if (firstStepEl) {
+      await waitForElement(firstStepEl, 3000);
+    }
 
     // Build driver.js dynamically (SSR safe)
     const { driver } = await import('driver.js');
-    await import('driver.js/dist/driver.css' as string);
-
-    const steps = def.steps.filter((_, i) => i >= startStep);
 
     const driverObj = driver({
       showProgress: true,
       progressText: 'Paso {{current}} de {{total}}',
-      nextBtnText: 'Siguiente →',
-      prevBtnText: '← Anterior',
-      doneBtnText: '✓ Finalizar',
+      nextBtnText: 'Siguiente',
+      prevBtnText: 'Anterior',
+      doneBtnText: 'Finalizar',
+      smoothScroll: true,
       allowClose: true,
       overlayOpacity: 0.72,
+      stagePadding: 8,
+      stageRadius: 12,
       popoverClass: 'renotech-tour-popover',
-      steps: steps.map((step, idx) => this.buildDriverStep(step, tourId, idx + startStep, def.steps.length, voice)),
+      steps: steps.map((step, idx) => this.buildDriverStep(step, idx + startStep, def.steps.length, voice)),
 
-      onHighlightStarted: (_el, step) => {
+      onPopoverRender: (popover, { driver }) => {
+        const prevBtn = popover.previousButton;
+        const nextBtn = popover.nextButton;
+
+        if (prevBtn) {
+          prevBtn.innerHTML = `<span class="flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" class="w-3 h-3" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>Anterior</span>`;
+        }
+
+        if (nextBtn) {
+          const isLast = driver.isLastStep();
+          if (isLast) {
+            nextBtn.innerHTML = `<span class="flex items-center gap-1.5">Finalizar<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" class="w-3 h-3" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg></span>`;
+          } else {
+            nextBtn.innerHTML = `<span class="flex items-center gap-1.5">Siguiente<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" class="w-3 h-3" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></span>`;
+          }
+        }
+      },
+
+      onHighlightStarted: (el, step, { driver }) => {
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         const matchedStep = steps.find(s => s.title === step.popover?.title);
         if (voice && matchedStep) {
           const text = matchedStep.narration || matchedStep.description;
@@ -214,15 +286,49 @@ class TourEngine {
         }
       },
 
+      onHighlighted: (el, step, { driver }) => {
+        if (el) {
+          setTimeout(() => { driver.refresh(); }, 150);
+        }
+      },
+
       onNextClick: (_el, _step, opts) => {
-        const newIdx = (opts.state.activeIndex ?? 0) + 1 + startStep;
-        saveState({ tourId, stepIndex: newIdx, practiceMode, timestamp: Date.now() });
+        const currentIdx = opts.state.activeIndex ?? 0;
+        const newIdx = currentIdx + 1 + startStep;
+        const nextStep = steps[currentIdx + 1];
+
+        if (nextStep?.route) {
+          this.pendingResume = { tourId, stepIndex: newIdx, timestamp: Date.now() };
+          saveState({ tourId, stepIndex: newIdx, timestamp: Date.now() });
+          opts.driver.destroy();
+          this.navigate(nextStep.route);
+          setTimeout(() => {
+            this.startTour(tourId, { startStep: newIdx, voice, onComplete, onSkip });
+          }, 600);
+          return;
+        }
+
+        saveState({ tourId, stepIndex: newIdx, timestamp: Date.now() });
         opts.driver.moveNext();
       },
 
       onPrevClick: (_el, _step, opts) => {
-        const newIdx = Math.max(0, (opts.state.activeIndex ?? 0) - 1 + startStep);
-        saveState({ tourId, stepIndex: newIdx, practiceMode, timestamp: Date.now() });
+        const currentIdx = opts.state.activeIndex ?? 0;
+        const prevIdx = Math.max(0, currentIdx - 1 + startStep);
+        const prevStep = steps[currentIdx - 1];
+
+        if (prevStep?.route) {
+          this.pendingResume = { tourId, stepIndex: prevIdx, timestamp: Date.now() };
+          saveState({ tourId, stepIndex: prevIdx, timestamp: Date.now() });
+          opts.driver.destroy();
+          this.navigate(prevStep.route);
+          setTimeout(() => {
+            this.startTour(tourId, { startStep: prevIdx, voice, onComplete, onSkip });
+          }, 600);
+          return;
+        }
+
+        saveState({ tourId, stepIndex: prevIdx, timestamp: Date.now() });
         opts.driver.movePrevious();
       },
 
@@ -232,14 +338,12 @@ class TourEngine {
         const isLastStep = idx >= totalSteps - startStep - 1;
 
         stopNarration();
-        hidePracticeBanner();
 
         if (isLastStep) {
           saveState(null);
           onComplete?.();
         } else {
-          // User pressed skip
-          saveState({ tourId, stepIndex: idx + startStep, practiceMode, timestamp: Date.now() });
+          saveState({ tourId, stepIndex: idx + startStep, timestamp: Date.now() });
           onSkip?.();
         }
         opts.driver.destroy();
@@ -252,39 +356,24 @@ class TourEngine {
 
   private buildDriverStep(
     step: TourStep,
-    _tourId: string,
     _stepIdx: number,
     _total: number,
     _voice: boolean
   ) {
-    // Try to find element — if selector matches nothing, use centered popover
-    const elementSelector = step.element
-      ? this.resolveSelector(step.element)
-      : undefined;
-
+    const selector = step.element;
     return {
-      element: elementSelector ?? undefined,
+      element: selector ? (() => document.querySelector(selector) as Element) : undefined,
       popover: {
         title: step.title,
         description: step.description,
-        side: step.side ?? (elementSelector ? 'bottom' : 'over'),
+        side: step.side ?? (selector ? 'bottom' : 'over'),
         align: step.align ?? 'start',
       },
     };
   }
 
-  /** Tries each comma-separated selector, returns first that exists in DOM */
-  private resolveSelector(selectors: string): string | undefined {
-    const parts = selectors.split(',').map(s => s.trim());
-    for (const sel of parts) {
-      try { if (document.querySelector(sel)) return sel; } catch {}
-    }
-    return undefined;
-  }
-
   stopTour() {
     stopNarration();
-    hidePracticeBanner();
     document.getElementById('__tour_branch_overlay')?.remove();
     this.currentDriver?.destroy();
     this.currentDriver = null;

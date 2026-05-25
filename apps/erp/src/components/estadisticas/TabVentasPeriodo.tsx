@@ -263,7 +263,7 @@ export default function TabVentasPeriodo({ branchId }: Props) {
                                 <YAxis tick={{ fontSize: 9, fill: '#64748b', fontWeight: 900 }} axisLine={false} tickLine={false}
                                     tickFormatter={v => `Bs. ${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`} />
                                 <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700 }}
-                                    formatter={(v: any, name?: string) => [`Bs. ${Number(v).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`, name === 'total' ? 'Ingreso neto' : 'Costo'] as [string, string]} />
+                                    formatter={(v: any, name?: any) => [`Bs. ${Number(v).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`, name === 'total' ? 'Ingreso neto' : 'Costo'] as [string, string]} />
                                 <Bar dataKey="total" name="total" radius={[6, 6, 0, 0]} maxBarSize={32} fill="#eab308" fillOpacity={0.85} />
                                 <Bar dataKey="costo" name="costo" radius={[6, 6, 0, 0]} maxBarSize={32} fill="#f43f5e" fillOpacity={0.5} />
                             </BarChart>

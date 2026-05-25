@@ -54,7 +54,7 @@ import {
 
     RotateCcw, DoorClosed, Percent, Truck, ArrowRight, AlertOctagon,
 
-    SlidersHorizontal, X
+    SlidersHorizontal, X, ChevronUp, ChevronDown
 
 } from 'lucide-react';
 
@@ -2888,7 +2888,7 @@ function DiscrepanciesTab({ resolverId, resolverName }: { resolverId: string; re
 
                 >
 
-                    <SlidersHorizontal size={11} /> Más filtros {showExtraFilters ? '?' : '?'}
+                    <SlidersHorizontal size={11} /> Más filtros {showExtraFilters ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
 
                 </button>
 
@@ -3482,13 +3482,13 @@ function ReviewDiscrepancyModal({
 
                                                         >
 
-                                                            <option value="NO_AJUSTAR">?? No ajustar stock origen (quedará incorrecto)</option>
+                                                            <option value="NO_AJUSTAR">No ajustar stock origen (quedará incorrecto)</option>
 
-                                                            {diff > 0 && <option value="DESCONTAR_ORIGEN">? Descontar {diff} adicional del origen (salieron {env + diff} en total)</option>}
+                                                            {diff > 0 && <option value="DESCONTAR_ORIGEN">Descontar {diff} adicional del origen (salieron {env + diff} en total)</option>}
 
-                                                            {diff < 0 && <option value="DEVOLVER_ORIGEN">? Devolver {Math.abs(diff)} al origen (no se enviaron)</option>}
+                                                            {diff < 0 && <option value="DEVOLVER_ORIGEN">Devolver {Math.abs(diff)} al origen (no se enviaron)</option>}
 
-                                                            {diff < 0 && <option value="MERMA_ORIGEN">? Registrar merma de {Math.abs(diff)} en origen (se perdieron)</option>}
+                                                            {diff < 0 && <option value="MERMA_ORIGEN">Registrar merma de {Math.abs(diff)} en origen (se perdieron)</option>}
 
                                                         </select>
 
@@ -3510,7 +3510,7 @@ function ReviewDiscrepancyModal({
 
                                                             <p className="text-[10px] text-rose-600 dark:text-rose-400 font-bold mt-1.5 bg-rose-50 dark:bg-rose-500/10 rounded-xl px-2 py-1">
 
-                                                                ?? Stock insuficiente en {envio?.fromBranchName}: tiene {originStock}, descontar {diff} adicional dejaría el stock en {(originStock ?? 0) - diff}. El sistema lo permitirá pero quedará en negativo — investiga si el conteo en destino es correcto.
+                                                                Stock insuficiente en {envio?.fromBranchName}: tiene {originStock}, descontar {diff} adicional dejaría el stock en {(originStock ?? 0) - diff}. El sistema lo permitirá pero quedará en negativo — investiga si el conteo en destino es correcto.
 
                                                             </p>
 

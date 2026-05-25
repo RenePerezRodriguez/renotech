@@ -1,0 +1,17 @@
+kind: "AppHostingYaml"
+version: "v1"
+
+# Tomamos control del build para manejar el monorepo y la estructura standalone
+scripts:
+  buildCommand: "npm run build && node ../../scripts/post-build-erp.js"
+  runCommand: "node .next/standalone/apps/erp/server.js"
+
+runConfig:
+  minInstances: 0
+  concurrency: 40
+
+env:
+  - variable: FIREBASE_SERVICE_ACCOUNT_KEY
+    secret: FIREBASE_SERVICE_ACCOUNT_KEY
+  - variable: DEEPSEEK_API_KEY
+    secret: DEEPSEEK_API_KEY

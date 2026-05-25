@@ -30,12 +30,13 @@ const ROUTE_TOURS: [string, string[]][] = [
   ['/transportes',    ['transportes-directorio']],
   ['/proveedores',    ['proveedores-nuevo']],
   ['/gerencia',       ['gerencia-dashboard']],
-  ['/cotizaciones',   ['cotizaciones-nueva']],
+  ['/cotizaciones',   ['cotizaciones-historial', 'cotizaciones-nueva']],
   ['/auditoria',              ['auditoria-consultar']],
   ['/estadisticas',           ['estadisticas-dashboard']],
   ['/configuracion/sucursales', ['sucursales-gestion']],
   ['/configuracion',            ['configuracion-general']],
   ['/usuarios',                 ['usuarios-gestion']],
+  ['/perfil',                   ['onboarding-completo']],
 ];
 
 interface HeaderProps {
@@ -127,7 +128,9 @@ export default function Header({ onOpenMobileMenu }: HeaderProps) {
 
                 <div className="h-8 w-px bg-slate-100 dark:bg-white/5 hidden sm:block mx-0.5 shrink-0" />
 
-                <UserProfileMenu />
+                <div data-tour="header-user">
+                    <UserProfileMenu />
+                </div>
             </div>
         </header>
 

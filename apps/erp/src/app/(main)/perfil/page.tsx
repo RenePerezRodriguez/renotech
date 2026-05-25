@@ -45,7 +45,7 @@ export default function ProfilePage() {
                     badge="Sincronizado"
                 />
 
-                <div className="bg-white dark:bg-[#111827] p-10 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl space-y-10 transition-all duration-500 relative overflow-hidden">
+                <div data-tour="perfil-form" className="bg-white dark:bg-[#111827] p-10 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl space-y-10 transition-all duration-500 relative overflow-hidden">
                     {/* Decorative Background Icon */}
                     <User size={200} className="absolute -right-10 -bottom-10 opacity-[0.02] dark:opacity-[0.03] pointer-events-none rotate-12" />
 

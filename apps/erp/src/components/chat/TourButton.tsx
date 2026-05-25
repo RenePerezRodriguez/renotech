@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { HelpCircle, X, Play } from 'lucide-react';
+import { HelpCircle, X, Play, RotateCcw } from 'lucide-react';
 import { useTour } from '@/hooks/useTour';
 import { TOUR_DEFINITIONS } from '@/lib/tours/definitions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -85,11 +85,11 @@ export default function TourButton({ tourIds, className = '' }: Props) {
               onClick={() => {
                 setOpen(false);
                 const state = getSavedState();
-                if (state) startTour(state.tourId, { startStep: state.stepIndex, practiceMode: state.practiceMode });
+                if (state) startTour(state.tourId, { startStep: state.stepIndex });
               }}
             >
               <span className="w-6 h-6 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 shrink-0">
-                ↩
+                <RotateCcw size={12} strokeWidth={2.5} />
               </span>
               <div>
                 <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Continuar donde lo dejé</p>
@@ -119,17 +119,6 @@ export default function TourButton({ tourIds, className = '' }: Props) {
             ))}
           </div>
 
-          <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-800">
-            <button
-              className="text-[10px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-              onClick={() => {
-                setOpen(false);
-                if (availableTours[0]) startTour(availableTours[0].id, { practiceMode: true });
-              }}
-            >
-              🎓 Modo práctica (sin cambios reales)
-            </button>
-          </div>
         </div>
       )}
     </div>

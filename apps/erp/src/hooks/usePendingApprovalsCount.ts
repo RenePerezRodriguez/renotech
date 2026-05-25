@@ -78,14 +78,12 @@ export function usePendingApprovalsCount(enabled: boolean) {
 
         const qDiscrep = query(
             collection(db, 'audit_alerts'),
-            where('type', '==', 'TRANSFER_DISCREPANCY')
+            where('type', '==', 'TRANSFER_DISCREPANCY'),
+            where('resolved', '==', false)
         );
         const unsubDiscrep = onSnapshot(
             qDiscrep,
-            snap => {
-                const open = snap.docs.filter(d => !(d.data() as { resolved?: boolean }).resolved).length;
-                setDiscrepancies(open);
-            },
+            snap => setDiscrepancies(snap.size),
             err => console.error('usePendingApprovalsCount(discrepancies):', err)
         );
 

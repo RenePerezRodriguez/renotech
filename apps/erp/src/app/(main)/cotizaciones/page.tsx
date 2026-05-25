@@ -363,13 +363,14 @@ export default function QuotationsPage() {
                         label: "Nueva Proforma",
                         onClick: () => router.push('/cotizaciones/nueva'),
                         icon: Plus,
-                        variant: 'primary' as const
+                        variant: 'primary' as const,
+                        dataTourId: 'cotizaciones-new-btn'
                     }
                 ]}
             />
 
             {/* KPI Cards - Technical Command Center Style (Suite Pro Standard) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div data-tour="cotizaciones-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiCard
                     label="Saldo Pendiente"
                     value={stats.totalAmount}
@@ -406,58 +407,60 @@ export default function QuotationsPage() {
             </div>
 
             {/* Filter Toolbar - High Density Suite Pro Standard */}
-            <FilterBar
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                searchPlaceholder="Buscar por cliente, nit o código de proforma..."
-                dateRange={{
-                    start: startDate,
-                    end: endDate,
-                    onStartChange: setStartDate,
-                    onEndChange: setEndDate
-                }}
-                filters={[
-                    {
-                        id: 'status',
-                        label: 'Estado',
-                        value: statusFilter,
-                        onChange: (val) => setStatusFilter(val as 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED'),
-                        options: [
-                            { label: 'Pendiente', value: 'PENDING' },
-                            { label: 'Vendida', value: 'CONVERTED' },
-                            { label: 'Anulada', value: 'REJECTED' }
-                        ]
-                    },
-                    ...(isConsolidatedView && userRole === 'GERENTE' ? [
+            <div data-tour="cotizaciones-filters">
+                <FilterBar
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    searchPlaceholder="Buscar por cliente, nit o código de proforma..."
+                    dateRange={{
+                        start: startDate,
+                        end: endDate,
+                        onStartChange: setStartDate,
+                        onEndChange: setEndDate
+                    }}
+                    filters={[
                         {
-                            id: 'branch',
-                            label: 'Sede',
-                            value: branchFilter,
-                            onChange: setBranchFilter,
-                            options: branches.map(b => ({ label: b.name, value: b.id || '' }))
+                            id: 'status',
+                            label: 'Estado',
+                            value: statusFilter,
+                            onChange: (val) => setStatusFilter(val as 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED'),
+                            options: [
+                                { label: 'Pendiente', value: 'PENDING' },
+                                { label: 'Vendida', value: 'CONVERTED' },
+                                { label: 'Anulada', value: 'REJECTED' }
+                            ]
                         },
-                        {
-                            id: 'seller',
-                            label: 'Agente',
-                            value: sellerFilter,
-                            onChange: setSellerFilter,
-                            options: sellersList.map(u => ({ label: u.name, value: u.id }))
-                        }
-                    ] : [])
-                ]}
-                onClear={() => {
-                    setSearchTerm('');
-                    setStartDate('');
-                    setEndDate('');
-                    setStatusFilter('ALL');
-                    setBranchFilter('ALL');
-                    setSellerFilter('Todos');
-                }}
-                isDirty={searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || branchFilter !== 'ALL' || sellerFilter !== 'Todos'}
-            />
+                        ...(isConsolidatedView && userRole === 'GERENTE' ? [
+                            {
+                                id: 'branch',
+                                label: 'Sede',
+                                value: branchFilter,
+                                onChange: setBranchFilter,
+                                options: branches.map(b => ({ label: b.name, value: b.id || '' }))
+                            },
+                            {
+                                id: 'seller',
+                                label: 'Agente',
+                                value: sellerFilter,
+                                onChange: setSellerFilter,
+                                options: sellersList.map(u => ({ label: u.name, value: u.id }))
+                            }
+                        ] : [])
+                    ]}
+                    onClear={() => {
+                        setSearchTerm('');
+                        setStartDate('');
+                        setEndDate('');
+                        setStatusFilter('ALL');
+                        setBranchFilter('ALL');
+                        setSellerFilter('Todos');
+                    }}
+                    isDirty={searchTerm !== '' || startDate !== '' || endDate !== '' || statusFilter !== 'ALL' || branchFilter !== 'ALL' || sellerFilter !== 'Todos'}
+                />
+            </div>
 
             {/* Table / List Container - Suite Pro Standard */}
-            <div className="bg-white dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-3xl shadow-xl flex flex-col overflow-hidden transition-all duration-500">
+            <div data-tour="cotizaciones-table" className="bg-white dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-3xl shadow-xl flex flex-col overflow-hidden transition-all duration-500">
                 {/* Top Pagination Bar */}
                 <TableFooter
                     totalItems={filteredQuotations.length}

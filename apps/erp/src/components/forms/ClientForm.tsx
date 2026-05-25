@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Client } from '@/types';
-import { Plus, Save, ChevronDown } from 'lucide-react';
+import { Plus, Save, ChevronDown, Info } from 'lucide-react';
 
 interface ClientFormProps {
     initialData?: Partial<Client> | null;
@@ -55,7 +55,7 @@ export default function ClientForm({
                 {/* Line 1: Main Identity - Audit Style */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2">
-                        <label className="flex items-end min-h-[24px] text-[9px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-[0.25em] mb-1.5 ml-1">Socio / Razón Social (REQUERIDO)</label>
+                        <label className="flex items-end min-h-6 text-[9px] font-black text-blue-500 dark:text-blue-400 uppercase tracking-[0.25em] mb-1.5 ml-1">Socio / Razón Social (REQUERIDO)</label>
                         <div className="relative group">
                             <input
                                 name="razonSocial"
@@ -70,7 +70,7 @@ export default function ClientForm({
                         </div>
                     </div>
                     <div className="md:col-span-1">
-                        <label className="flex items-end min-h-[24px] text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">NIT / CI (OPCIONAL)</label>
+                        <label className="flex items-end min-h-6 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">NIT / CI (OPCIONAL)</label>
                         <input
                             name="nit"
                             type="text"
@@ -85,7 +85,7 @@ export default function ClientForm({
                 {/* Line 2: Fiscal & Contact - Technical Efficiency */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                     <div className="col-span-1">
-                        <label className="flex items-end min-h-[24px] text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">Tipo Fiscal</label>
+                        <label className="flex items-end min-h-6 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">Tipo Fiscal</label>
                         <div className="relative">
                             <select
                                 name="tipo"
@@ -102,7 +102,7 @@ export default function ClientForm({
                         </div>
                     </div>
                     <div className="col-span-1">
-                        <label className="flex items-end min-h-[24px] text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">Teléfono Principal</label>
+                        <label className="flex items-end min-h-6 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">Teléfono Principal</label>
                         <input
                             name="telefono"
                             type="text"
@@ -113,7 +113,7 @@ export default function ClientForm({
                         />
                     </div>
                     <div className="col-span-2">
-                        <label className="flex items-end min-h-[24px] text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">Email Corporativo</label>
+                        <label className="flex items-end min-h-6 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.25em] mb-1.5 ml-1">Email Corporativo</label>
                         <input
                             name="email"
                             type="email"
@@ -140,7 +140,14 @@ export default function ClientForm({
 
                 {/* Line 3.5: Línea de Crédito (habilita ventas a CRÉDITO) */}
                 <div>
-                    <label className="block text-[9px] font-black text-purple-500 dark:text-purple-400 uppercase tracking-[0.25em] mb-1.5 ml-1">Línea de Crédito (Bs.) — 0 = sin crédito</label>
+                    <label className="flex items-center gap-2 text-[9px] font-black text-purple-500 dark:text-purple-400 uppercase tracking-[0.25em] mb-1.5 ml-1">
+                        <span>Línea de Crédito (Bs.) — 0 = sin crédito</span>
+                        <Info
+                            size={12}
+                            className="text-purple-500 hover:text-purple-400 cursor-help"
+                            title="En esta versión, 0 también actúa como 'sin límite explícito' en la validación actual. Para restringir ventas a crédito, asigna un monto mayor a 0."
+                        />
+                    </label>
                     <input
                         name="lineaDeCredito"
                         type="number"

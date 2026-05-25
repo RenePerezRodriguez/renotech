@@ -14,23 +14,24 @@
             "npm --prefix \"$RESOURCE_DIR\" run build"
         ]
     },
-    "hosting": [
+    "apphosting": [
         {
-            "target": "erp",
-            "source": "apps/erp",
+            "backendId": "renotech-erp",
+            "rootDir": "apps/erp",
             "ignore": [
-                "firebase.json",
-                "**/.*",
-                "**/node_modules/**"
+                "node_modules",
+                ".git",
+                ".next"
             ]
         },
         {
-            "target": "landing",
-            "source": "apps/landing",
+            "backendId": "renotech-web",
+            "rootDir": "apps/landing",
             "ignore": [
-                "firebase.json",
-                "**/.*",
-                "**/node_modules/**"
+                "node_modules",
+                ".git",
+                ".astro",
+                "dist"
             ]
         }
     ]

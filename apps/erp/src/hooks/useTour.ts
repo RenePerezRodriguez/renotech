@@ -8,9 +8,17 @@ import type { TourOptions, TourState } from '@/lib/tours/engine';
 export function useTour() {
   const router = useRouter();
 
-  // Wire navigation once
   useEffect(() => {
     tourEngine.setNavigate((route) => router.push(route));
+
+    // Auto-resume after cross-route tour navigation
+    const pending = tourEngine.consumePendingResume();
+    if (pending) {
+      const timer = setTimeout(() => {
+        tourEngine.startTour(pending.tourId, { startStep: pending.stepIndex });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
   }, [router]);
 
   const startTour = useCallback((tourId: string, options?: TourOptions) => {
@@ -20,10 +28,7 @@ export function useTour() {
   const resumeTour = useCallback(() => {
     const state = tourEngine.getSavedState();
     if (!state) return false;
-    tourEngine.startTour(state.tourId, {
-      startStep: state.stepIndex,
-      practiceMode: state.practiceMode,
-    });
+    tourEngine.startTour(state.tourId, { startStep: state.stepIndex });
     return true;
   }, []);
 

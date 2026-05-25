@@ -48,6 +48,7 @@ const TOURS = [
   'sucursales-gestion',
   'usuarios-gestion',
   'configuracion-general',
+  'onboarding-completo',
 ].map(t => `[TOUR:${t}]`).join(' ');
 
 const ROLE_RULES: Record<string, string> = {

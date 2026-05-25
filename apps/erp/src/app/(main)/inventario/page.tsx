@@ -489,7 +489,7 @@ export default function InventoryPage() {
             />
 
             {/* KPI Grid - Suite Pro v4.0 */}
-            <div className={clsx("grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6", isGerente ? "lg:grid-cols-6" : "lg:grid-cols-5")}>
+            <div data-tour="inventario-kpis" className={clsx("grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6", isGerente ? "lg:grid-cols-6" : "lg:grid-cols-5")}>
                 <KpiCard
                     label="Activos en Custodia"
                     value={stats.total}
@@ -565,7 +565,7 @@ export default function InventoryPage() {
                             <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
                                 <TrendingUp size={28} className="text-slate-300 dark:text-slate-700" />
                                 <p className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wide">Sin datos de inversión</p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 max-w-[220px]">Los productos necesitan tener <strong>costo unitario</strong> y <strong>stock mayor a 0</strong> para aparecer aquí</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 max-w-55">Los productos necesitan tener <strong>costo unitario</strong> y <strong>stock mayor a 0</strong> para aparecer aquí</p>
                             </div>
                         ) : (
                         <div className="space-y-4">
@@ -611,7 +611,7 @@ export default function InventoryPage() {
                             <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
                                 <Package size={28} className="text-slate-300 dark:text-slate-700" />
                                 <p className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wide">Sin datos de origen</p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500 max-w-[220px]">Los productos necesitan tener <strong>costo unitario</strong>, <strong>origen</strong> y <strong>stock mayor a 0</strong> para aparecer aquí</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500 max-w-55">Los productos necesitan tener <strong>costo unitario</strong>, <strong>origen</strong> y <strong>stock mayor a 0</strong> para aparecer aquí</p>
                             </div>
                         ) : (
                         <div className="space-y-4">

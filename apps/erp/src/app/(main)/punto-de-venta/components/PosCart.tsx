@@ -1544,6 +1544,7 @@ export default function PosCart() {
             <div className="px-4 py-2 bg-slate-50/50 dark:bg-white/5 border-b border-slate-100 dark:border-white/10 flex flex-col gap-2">
                 <div className="flex gap-2">
                     <button
+                        data-tour="pos-client"
                         onClick={() => setIsClientModalOpen(true)}
                         className={clsx(
                             "flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all text-left group",

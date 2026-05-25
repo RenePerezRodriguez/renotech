@@ -372,6 +372,7 @@ export default function InventoryTable({
         producto: 'Titular de Activo / ID',
         marca: 'Información Técnica / Marca',
         categoria: 'Familia / Categoría',
+        descripcion: 'Descripción Detallada',
         costo: 'Costo Unitario',
         stock: 'Existencia Stock',
         acciones: 'Acciones',
@@ -536,6 +537,7 @@ export default function InventoryTable({
         producto: true,
         marca: true,
         categoria: true,
+        descripcion: false,
         costo: isGerente,
         stock: true,
         acciones: true,
@@ -596,10 +598,23 @@ export default function InventoryTable({
     }, [popoverProductId, hoverProductId]);
 
     const toggleColumn = (key: string) => {
-        const newState = { ...visibleColumns, [key]: !visibleColumns[key] };
-        setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
-        localStorage.setItem('inventory_columns', JSON.stringify(newState));
+        setVisibleColumns(prev => {
+            const newState = { ...prev, [key]: !prev[key] };
+            localStorage.setItem('inventory_columns', JSON.stringify(newState));
+            return newState;
+        });
     };
+
+    const visibleColumnCount = 1 + // Checkbox
+        (visibleColumns.producto ? 1 : 0) +
+        (visibleColumns.categoria ? 1 : 0) +
+        (visibleColumns.descripcion ? 1 : 0) +
+        (visibleColumns.costo && isGerente ? 1 : 0) +
+        (visibleColumns.precioSinFactura ? 1 : 0) +
+        (visibleColumns.precioConFactura ? 1 : 0) +
+        (visibleColumns.utilidad && isGerente ? 1 : 0) +
+        (visibleColumns.stock ? 1 : 0) +
+        (visibleColumns.acciones ? 1 : 0);
 
 
 
@@ -637,9 +652,9 @@ export default function InventoryTable({
                         {showColumnMenu && (
                             <>
                                 <div className="fixed inset-0 z-100" onClick={() => setShowColumnMenu(false)} />
-                                <div className="absolute left-0 right-0 sm:left-auto sm:right-0 top-full mt-3 w-full sm:w-56 max-h-[min(70vh,24rem)] overflow-y-auto bg-white/95 dark:bg-background/95 backdrop-blur-xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/60 dark:border-white/10 p-4 z-101 animate-in fade-in slide-in-from-top-4 duration-300">
+                                <div className="absolute left-0 right-0 sm:left-auto sm:right-0 top-full mt-3 w-full sm:w-64 max-h-[min(70vh,24rem)] overflow-x-hidden overflow-y-auto custom-scrollbar bg-white/95 dark:bg-background/95 backdrop-blur-xl rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/60 dark:border-white/10 p-4 z-101 animate-in fade-in slide-in-from-top-4 duration-300">
                                     <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 px-3 py-2 uppercase tracking-[0.2em] mb-2 border-b border-slate-100 dark:border-white/10">Preferencias de Columnas</div>
-                                    <div className="space-y-1 max-h-75 overflow-y-auto pr-1">
+                                    <div className="space-y-1 pr-1">
                                         {Object.keys(visibleColumns).filter(k => k !== 'costo' || isGerente).map(key => (
                                             <label key={key} className="flex items-center gap-3 p-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-colors group">
                                                 <div className="relative flex items-center">
@@ -802,6 +817,12 @@ export default function InventoryTable({
                                                 )}
                                             </div>
 
+                                            {visibleColumns.descripcion && !!product.descripcion && (
+                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 mb-2 line-clamp-2 bg-slate-50/50 dark:bg-white/5 p-2 rounded-xl border border-slate-100 dark:border-white/5">
+                                                    {product.descripcion}
+                                                </p>
+                                            )}
+
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 tabular-nums">
@@ -882,6 +903,7 @@ export default function InventoryTable({
                             </th>
                             {visibleColumns.producto && <th className="px-6 py-4">{columnLabels.producto}</th>}
                             {visibleColumns.categoria && <th className="px-6 py-4 text-center">{columnLabels.categoria}</th>}
+                            {visibleColumns.descripcion && <th className="px-6 py-4">{columnLabels.descripcion}</th>}
                             {visibleColumns.costo && isGerente && <th className="px-6 py-4 text-right">{columnLabels.costo}</th>}
                             {visibleColumns.precioSinFactura && <th className="px-6 py-4 text-right">{columnLabels.precioSinFactura}</th>}
                             {visibleColumns.precioConFactura && <th className="px-6 py-4 text-right">{columnLabels.precioConFactura}</th>}
@@ -893,7 +915,7 @@ export default function InventoryTable({
                     <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                         {filteredProducts.length === 0 ? (
                             <tr>
-                                <td colSpan={10} className="py-32 text-center">
+                                <td colSpan={visibleColumnCount} className="py-32 text-center">
                                     <div className="flex flex-col items-center gap-4">
                                         <Package size={64} strokeWidth={0.5} className="opacity-20 translate-y-4 text-slate-400" />
                                         <p className="text-[10px] font-black uppercase tracking-[0.4em]">Data Vault Empty</p>
@@ -1058,6 +1080,13 @@ export default function InventoryTable({
                                             </td>
                                         )}
 
+                                        {visibleColumns.descripcion && (
+                                            <td className="px-6 py-4 min-w-50 max-w-xs">
+                                                <div className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2" title={product.descripcion}>
+                                                    {product.descripcion || '---'}
+                                                </div>
+                                            </td>
+                                        )}
 
                                         {visibleColumns.costo && isGerente && (
                                             <td className="px-6 py-4 text-right">

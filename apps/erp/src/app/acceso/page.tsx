@@ -90,6 +90,7 @@ export default function LoginPage() {
             const displayName = cred.user.displayName || email;
             flushSync(() => { setSplashName(displayName); setShowSplash(true); });
             logAdminAction(cred.user.uid, email, 'LOGIN_SUCCESS', cred.user.uid, 'GLOBAL', 'Inicio de sesión exitoso').catch(() => {});
+            sessionStorage.setItem('rnt_has_session', '1');
             setTimeout(() => router.push('/inicio'), 2000);
         } catch (err: unknown) {
             const e2 = err as { code?: string };
