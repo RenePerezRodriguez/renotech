@@ -72,6 +72,7 @@ export default function SalesHistoryPage() {
     const closeVoidModal = useCallback(() => setVoidModal({ isOpen: false, type: 'SALE', sale: null }), []);
     const voidDismiss = useModalDismiss(voidModal.isOpen, closeVoidModal, { disabled: !!isVoiding });
     const [voidReason, setVoidReason] = useState('');
+    const [voidItemQty, setVoidItemQty] = useState<number>(1);
     const [saleInstallments, setSaleInstallments] = useState<Installment[]>([]);
 
     // Load installments when a CUOTAS sale is selected
@@ -301,6 +302,14 @@ export default function SalesHistoryPage() {
     };
 
     const promptReturnItem = (sale: Sale, itemIndex: number) => {
+        const item = sale.items?.[itemIndex];
+        if (!item) return;
+        const availableQty = item.quantity - (item.returnedQuantity || 0);
+        if (availableQty <= 0) {
+            toast.error('Este ítem ya fue devuelto en su totalidad');
+            return;
+        }
+        setVoidItemQty(availableQty);
         setVoidModal({ isOpen: true, type: 'ITEM', sale, itemIndex });
         setVoidReason('');
     };
@@ -358,7 +367,7 @@ export default function SalesHistoryPage() {
                     uid: currentUser?.uid || '?',
                     email: currentUser?.email || '?',
                     branchId: sale.branchId || '?'
-                });
+                }, voidItemQty);
                 toast.success('Devolución del producto procesada');
             }
 
@@ -950,13 +959,34 @@ export default function SalesHistoryPage() {
                                                         <tr key={idx} className={clsx("bg-white dark:bg-background", item?.isVoided && "bg-rose-500/5 opacity-50")}>
                                                             <td className="px-4 py-3">
                                                                 <p className={clsx("font-bold text-slate-900 dark:text-slate-200 text-xs tracking-tight", item?.isVoided && "line-through")}>{item?.productName || 'N/A'}</p>
-                                                                {item?.isVoided && <p className="text-[8px] font-black text-rose-500 uppercase mt-0.5 animate-pulse">Devolución Procesada</p>}
+                                                                {item?.isVoided ? (
+                                                                    <p className="text-[8px] font-black text-rose-500 uppercase mt-0.5 animate-pulse">Devolución Procesada</p>
+                                                                ) : item?.returnedQuantity && item.returnedQuantity > 0 ? (
+                                                                    <p className="text-[8px] font-black text-amber-500 uppercase mt-0.5">Devolución Parcial ({item.returnedQuantity})</p>
+                                                                ) : null}
                                                             </td>
-                                                            <td className="px-4 py-3 text-center"><span className="font-mono font-black text-blue-500 dark:text-blue-400 text-xs">x{item?.quantity ?? 0}</span></td>
-                                                            <td className="px-4 py-3 text-right"><span className="font-mono font-black text-slate-900 dark:text-white text-xs tabular-nums">{item?.subtotal?.toFixed(2) ?? '0.00'}</span></td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <span className={clsx("font-mono font-black text-xs", item?.isVoided ? "text-slate-400" : "text-blue-500 dark:text-blue-400")}>
+                                                                    x{(item?.quantity || 0) - (item?.returnedQuantity || 0)}
+                                                                </span>
+                                                                {item?.returnedQuantity && item.returnedQuantity > 0 && !item?.isVoided ? (
+                                                                    <span className="block text-[10px] text-slate-400 line-through">x{item.quantity}</span>
+                                                                ) : null}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right">
+                                                                <span className="font-mono font-black text-slate-900 dark:text-white text-xs tabular-nums">
+                                                                    {(((item?.subtotal || 0) / (item?.quantity || 1)) * ((item?.quantity || 0) - (item?.returnedQuantity || 0))).toFixed(2)}
+                                                                </span>
+                                                            </td>
                                                             <td className="px-4 py-3 text-center">
                                                                 {!item?.isVoided && sale.status !== 'VOIDED' && (
-                                                                    <button onClick={() => promptReturnItem(sale, idx)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all active:scale-90"><CornerUpLeft size={16} /></button>
+                                                                    <button 
+                                                                        onClick={() => promptReturnItem(sale, idx)} 
+                                                                        className="px-3 py-1.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-100 dark:hover:bg-rose-500/20 hover:scale-105 transition-all active:scale-95"
+                                                                        title="Devolver Producto"
+                                                                    >
+                                                                        Devolver
+                                                                    </button>
                                                                 )}
                                                             </td>
                                                         </tr>
@@ -1101,6 +1131,27 @@ export default function SalesHistoryPage() {
                                     <p className="text-xs text-slate-500 dark:text-slate-400 font-medium px-4 leading-relaxed">{voidModal.type === 'SALE' ? 'Esta acción invalidará la venta por completo y restaurará el inventario asociado.' : 'El stock de este producto será reintegrado automáticamente.'}</p>
                                 </div>
                                 <div className="p-8 space-y-4">
+                                    {voidModal.type === 'ITEM' && voidModal.itemIndex !== undefined && voidModal.sale?.items?.[voidModal.itemIndex] && (
+                                        <div className="mb-4">
+                                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 px-1">Cantidad a devolver <span className="text-rose-500">*</span></label>
+                                            <input 
+                                                type="number" 
+                                                min={1} 
+                                                max={voidModal.sale.items[voidModal.itemIndex].quantity - (voidModal.sale.items[voidModal.itemIndex].returnedQuantity || 0)} 
+                                                value={voidItemQty}
+                                                onChange={(e) => {
+                                                    const max = voidModal.sale!.items![voidModal.itemIndex!].quantity - (voidModal.sale!.items![voidModal.itemIndex!].returnedQuantity || 0);
+                                                    let val = parseInt(e.target.value);
+                                                    if (isNaN(val)) val = 1;
+                                                    if (val < 1) val = 1;
+                                                    if (val > max) val = max;
+                                                    setVoidItemQty(val);
+                                                }}
+                                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-2xl p-4 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                            />
+                                            <p className="text-[10px] text-slate-500 mt-2 px-1">Máximo disponible: {voidModal.sale.items[voidModal.itemIndex].quantity - (voidModal.sale.items[voidModal.itemIndex].returnedQuantity || 0)}</p>
+                                        </div>
+                                    )}
                                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 px-1">Justificación Obligatoria <span className="text-rose-500">*</span></label>
                                     <textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Indique el motivo técnico..." className="w-full bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-2xl p-4 text-xs dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-yellow-500 resize-none h-28 outline-none transition-all" autoFocus />
                                 </div>

@@ -24,6 +24,7 @@ import ModuleHeader from '@/components/common/ModuleHeader';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import { ensureDate } from '@/utils/dateHelpers';
 import { normalizeText } from '@/utils/normalize';
+import { searchProducts } from '@/utils/searchProducts';
 import clsx from 'clsx';
 
 type DeletedProduct = Product & { deletedAt?: Timestamp; deletedBy?: string };
@@ -60,14 +61,8 @@ export default function BajasPage() {
     }, []);
 
     const filtered = useMemo(() => {
-        const norm = normalizeText(searchTerm);
-        if (!norm) return products;
-        return products.filter(p =>
-            normalizeText(p.nombre).includes(norm) ||
-            normalizeText(p.codigo).includes(norm) ||
-            normalizeText(p.marca || '').includes(norm) ||
-            normalizeText(p.categoria || '').includes(norm)
-        );
+        if (!searchTerm.trim()) return products;
+        return searchProducts(products, searchTerm, 200) as DeletedProduct[];
     }, [products, searchTerm]);
 
     const handleRestore = async () => {

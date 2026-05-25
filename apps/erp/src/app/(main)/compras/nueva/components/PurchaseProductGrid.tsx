@@ -15,6 +15,7 @@ import EmptyState from '@/components/common/EmptyState';
 import { useProductHoverPreview } from '@/hooks/useProductHoverPreview';
 import ProductPreviewTooltip from '@/components/common/ProductPreviewTooltip';
 import ProductContextMenu from '@/components/common/ProductContextMenu';
+import { searchProducts } from '@/utils/searchProducts';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -103,12 +104,11 @@ export default function PurchaseProductGrid({ onProductSelect, onNewProduct }: P
 
     // Filtered & Sorted
     const filteredProducts = useMemo(() => {
-        const filtered = products.filter(p => {
-            const term = searchTerm.toLowerCase();
-            const matchesSearch =
-                p.nombre.toLowerCase().includes(term) ||
-                p.codigo.toLowerCase().includes(term) ||
-                (p.codigoOE && p.codigoOE.toLowerCase().includes(term));
+        const termFiltered = searchTerm.trim()
+            ? searchProducts(products, searchTerm, 1000)
+            : products;
+
+        const filtered = termFiltered.filter(p => {
             const matchesCategory = selectedCategory === 'Todos' || (p.categoria || 'Otros') === selectedCategory;
             const matchesBrand = selectedBrand === 'Todas' || p.marca === selectedBrand;
             const matchesOrigin = selectedOrigin === 'Todos' || p.origen === selectedOrigin;
@@ -118,8 +118,12 @@ export default function PurchaseProductGrid({ onProductSelect, onNewProduct }: P
                 (stockFilter === 'en-stock' && (p.stock ?? 0) > 0) ||
                 (stockFilter === 'sin-stock' && (p.stock ?? 0) === 0) ||
                 (stockFilter === 'bajo-min' && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= min);
-            return matchesSearch && matchesCategory && matchesBrand && matchesOrigin && matchesStock;
+            return matchesCategory && matchesBrand && matchesOrigin && matchesStock;
         });
+
+        if (searchTerm.trim()) {
+            return filtered;
+        }
 
         return filtered.sort((a, b) => {
             switch (sortMode) {

@@ -1,4 +1,4 @@
-﻿
+
 'use client';
 
 import { usePosStore } from '@/store/posStore';
@@ -25,8 +25,11 @@ const QRScanner = dynamic(() => import('@/components/common/QRScanner'), {
 });
 import { Skeleton } from '@/components/ui/skeleton';
 import EmptyState from '@/components/common/EmptyState';
-import { normalizeText } from '@/utils/normalize';
+import ProductContextMenu from '@/components/common/ProductContextMenu';
 import ProductPreviewTooltip from '@/components/common/ProductPreviewTooltip';
+import { useProductHoverPreview } from '@/hooks/useProductHoverPreview';
+import { searchProducts } from '@/utils/searchProducts';
+import { normalizeText } from '@/utils/normalize';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -244,15 +247,11 @@ export default function ProductGrid() {
 
     // Filter products
     const filteredProducts = useMemo(() => {
-        const normSearch = normalizeText(searchTerm);
-        const filtered = products.filter(p => {
-            const matchesSearch =
-                normalizeText(p.nombre).includes(normSearch) ||
-                normalizeText(p.codigo).includes(normSearch) ||
-                normalizeText(p.codigoFabrica as string).includes(normSearch) ||
-                normalizeText(p.codigoOE as string).includes(normSearch) ||
-                normalizeText(p.id).includes(normSearch);
+        const termFiltered = searchTerm.trim() 
+            ? searchProducts(products, searchTerm, 1000) 
+            : products;
 
+        const filtered = termFiltered.filter(p => {
             const matchesCategory = selectedCategory === 'Todos' || (p.categoria || 'Otros') === selectedCategory;
             const matchesBrand = selectedBrand === 'Todas' || p.marca === selectedBrand;
             const matchesOrigin = selectedOrigin === 'Todos' || p.origen === selectedOrigin;
@@ -262,8 +261,14 @@ export default function ProductGrid() {
                 (stockFilter === 'en-stock' && (p.stock ?? 0) > 0) ||
                 (stockFilter === 'sin-stock' && (p.stock ?? 0) === 0) ||
                 (stockFilter === 'bajo-min' && (p.stock ?? 0) > 0 && (p.stock ?? 0) <= min);
-            return matchesSearch && matchesCategory && matchesBrand && matchesOrigin && matchesStock;
+            return matchesCategory && matchesBrand && matchesOrigin && matchesStock;
         });
+        // Si hay una búsqueda activa, searchProducts ya ordenó por relevancia. 
+        // Solo ordenamos manualmente si no hay búsqueda.
+        if (searchTerm.trim()) {
+            return filtered;
+        }
+
         const priceOf = (p: Product) => p.precioVenta ?? p.precio ?? 0;
         return filtered.sort((a, b) => {
             switch (sortMode) {

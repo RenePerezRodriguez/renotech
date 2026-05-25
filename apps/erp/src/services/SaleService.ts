@@ -726,7 +726,7 @@ export const SaleService = {
     },
 
     // Void Single Item (Refactored)
-    voidSaleItem: async (saleId: string, itemId: string, userId: string, reason: string, adminInfo?: { uid: string, email: string, branchId: string }) => {
+    voidSaleItem: async (saleId: string, itemId: string, userId: string, reason: string, adminInfo?: { uid: string, email: string, branchId: string }, quantityToVoid?: number) => {
         try {
             const saleRef = doc(db, COLLECTION_NAME, saleId);
             const saleSnap = await getDoc(saleRef);
@@ -785,14 +785,30 @@ export const SaleService = {
                 if (resolvedSingle?.sessionId) await JournalService.txEnsureSessionOpen(transaction, resolvedSingle.sessionId);
 
                 // ============= FASE 2: TODAS LAS ESCRITURAS =============
-                // 1. Mark item voided
-                transaction.update(itemRef, { isVoided: true });
+                
+                const returnedQty = item.returnedQuantity || 0;
+                const availableToReturn = item.quantity - returnedQty;
+                const qtyToReturn = quantityToVoid !== undefined ? quantityToVoid : availableToReturn;
+
+                if (qtyToReturn <= 0 || qtyToReturn > availableToReturn) {
+                    throwStandardError('INV_INVALID_ADJUSTMENT', 'La cantidad a devolver es inválida');
+                }
+
+                const newReturnedQty = returnedQty + qtyToReturn;
+                const isFullyVoided = newReturnedQty >= item.quantity;
+                const voidedSubtotal = Number(((item.subtotal / item.quantity) * qtyToReturn).toFixed(2));
+
+                // 1. Mark item voided if fully returned, or update returnedQuantity
+                transaction.update(itemRef, { 
+                    isVoided: isFullyVoided,
+                    returnedQuantity: newReturnedQty
+                });
 
                 // 2. Restore Stock
                 if (productSnap.exists()) {
                     const pData = productSnap.data();
                     const currentStock = pData.stock || 0;
-                    const newStock = currentStock + item.quantity;
+                    const newStock = currentStock + qtyToReturn;
                     transaction.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
 
                     const movRef = doc(collection(db, 'movimientos'));
@@ -801,10 +817,10 @@ export const SaleService = {
                         masterId: pData.masterId,
                         branchId: saleData.branchId,
                         type: 'ENTRADA',
-                        quantity: item.quantity,
+                        quantity: qtyToReturn,
                         currentStock: newStock,
                         previousStock: currentStock,
-                        reason: `Devolución Ítem Venta #${saleId.slice(-6).toUpperCase()} — ${saleData.cliente?.razonSocial || 'Cliente Casual'}`,
+                        reason: `Devolución Parcial (${qtyToReturn} unid.) Ítem Venta #${saleId.slice(-6).toUpperCase()} — ${saleData.cliente?.razonSocial || 'Cliente Casual'}`,
                         referenceId: saleId,
                         date: serverTimestamp(),
                         userId: userId,
@@ -817,7 +833,7 @@ export const SaleService = {
                 const prevSubtotal = Number(saleData.subtotal) || 0;
                 const prevTax = Number(saleData.tax) || 0;
                 const taxRate = prevSubtotal > 0 ? prevTax / prevSubtotal : 0;
-                const newSubtotal = Math.max(0, prevSubtotal - Number(item.subtotal));
+                const newSubtotal = Math.max(0, prevSubtotal - voidedSubtotal);
                 const newTax = Number((newSubtotal * taxRate).toFixed(2));
                 const newTotal = Math.max(0, newSubtotal + newTax);
 
@@ -834,10 +850,10 @@ export const SaleService = {
                 if (['EFECTIVO', 'TARJETA', 'QR'].includes(saleData.metodoPago) && resolvedSingle && accSingle) {
                     JournalService.txWriteEntry(transaction, accSingle, {
                         accountId: resolvedSingle.accountId,
-                        amount: Number(item.subtotal),
+                        amount: voidedSubtotal,
                         paymentMethod: saleData.metodoPago === 'QR' ? 'QR' : 'EFECTIVO',
                         category: 'DEVOLUCION_VENTA',
-                        description: `Devolución Ítem en Venta #${saleId.slice(-6)} (${reason})`,
+                        description: `Devolución Ítem en Venta #${saleId.slice(-6)} (${qtyToReturn} unid.) (${reason})`,
                         referenceType: 'SALE',
                         referenceId: saleId,
                         sessionId: resolvedSingle.sessionId,
@@ -848,13 +864,13 @@ export const SaleService = {
                 } else if (saleData.metodoPago === 'CREDITO' && saleData.cliente?.id) {
                     if (clientRef && clientExists) {
                         transaction.update(clientRef, {
-                            saldoDeudor: Math.max(0, clientCurrentDebt - Number(item.subtotal))
+                            saldoDeudor: Math.max(0, clientCurrentDebt - voidedSubtotal)
                         });
                     }
 
                     // También actualizar cuentas_corrientes vinculadas a esta venta
                     if (arSnapPre) {
-                        let remainingDelta = Number(item.subtotal);
+                        let remainingDelta = voidedSubtotal;
                         for (const arDoc of arSnapPre.docs) {
                             if (remainingDelta <= 0) break;
                             const arData = arDoc.data();

@@ -11,7 +11,10 @@ import { useRouter } from 'next/navigation';
 import { Purchase, PurchaseItem, SupplierAccount } from '@/types';
 import { useTransactionItems } from '@/hooks/useTransactionItems';
 import { useBranch } from '@/contexts/BranchContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { SupplierAccountService } from '@/services/SupplierAccountService';
+import { PurchaseService } from '@/services/PurchaseService';
+import { toast } from 'sonner';
 import clsx from 'clsx';
 import { downloadCSV } from '@/utils/csvExport';
 import { ensureDate, formatDate, formatDateTime } from '@/utils/dateHelpers';
@@ -22,12 +25,13 @@ import ModuleHeader from '@/components/common/ModuleHeader';
 import KpiCard from '@/components/common/KpiCard';
 import FilterBar from '@/components/common/FilterBar';
 import TableFooter from '@/components/common/TableFooter';
-import { CheckCircle, Truck, ShoppingBag, Plus, Eye, Calendar, TrendingUp, X, Download, FileText } from 'lucide-react';
+import { CheckCircle, Truck, ShoppingBag, Plus, Eye, Calendar, TrendingUp, X, Download, FileText, AlertTriangle, CornerUpLeft } from 'lucide-react';
 import { PrintService } from '@/services/PrintService';
 
 export default function PurchasesPage() {
     const { isOnline } = useNetworkStatus();
     const router = useRouter();
+    const { user: currentUser } = useAuth();
     const { currentBranch, branches, isConsolidatedView, loading: branchLoading } = useBranch();
     const [purchases, setPurchases] = useState<Purchase[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,13 +42,75 @@ export default function PurchasesPage() {
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
     const { items: selectedPurchaseItems, loading: loadingItems } = useTransactionItems<PurchaseItem>(selectedPurchase?.id, 'compras');
     const [generatingPdf, setGeneratingPdf] = useState(false);
+    
+    // Void Modal State
+    const [voidModal, setVoidModal] = useState<{ isOpen: boolean, type: 'ITEM', purchase: Purchase | null, itemIndex?: number }>({ isOpen: false, type: 'ITEM', purchase: null });
+    const [voidReason, setVoidReason] = useState('');
+    const [voidItemQty, setVoidItemQty] = useState<number>(1);
+    const [isVoiding, setIsVoiding] = useState(false);
+
+    const closeVoidModal = () => setVoidModal({ isOpen: false, type: 'ITEM', purchase: null });
+
+    const promptReturnItem = (purchase: Purchase, itemIndex: number) => {
+        const item = selectedPurchaseItems[itemIndex];
+        if (!item) return;
+        const availableQty = item.quantity - (item.returnedQuantity || 0);
+        if (availableQty <= 0) {
+            toast.error('Este producto ya fue devuelto en su totalidad.');
+            return;
+        }
+        setVoidItemQty(availableQty);
+        setVoidModal({ isOpen: true, type: 'ITEM', purchase, itemIndex });
+        setVoidReason('');
+    };
+
+    const confirmVoidAction = async () => {
+        if (!voidModal.purchase || voidModal.itemIndex === undefined) return;
+        if (!voidReason.trim()) {
+            toast.error('Debe ingresar un motivo para la anulación');
+            return;
+        }
+        
+        setIsVoiding(true);
+        try {
+            const purchase = voidModal.purchase;
+            const itemId = selectedPurchaseItems[voidModal.itemIndex]?.id;
+            if (!itemId) throw new Error("ID de ítem no encontrado");
+            
+            await PurchaseService.voidPurchaseItem(
+                purchase.id!,
+                itemId,
+                voidItemQty,
+                voidReason,
+                {
+                    uid: currentUser?.uid || '?',
+                    email: currentUser?.email || '?',
+                    branchId: purchase.branchId || '?',
+                    name: currentUser?.displayName || currentUser?.email || '?'
+                }
+            );
+            toast.success('Devolución del producto procesada exitosamente.');
+            closeVoidModal();
+
+            // Refrescar modal si está abierto
+            if (selectedPurchase && selectedPurchase.id === purchase.id) {
+                const updatedPurchases = await PurchaseService.getPurchases(isConsolidatedView ? undefined : currentBranch?.id);
+                const fresh = updatedPurchases.find(p => p.id === purchase.id);
+                if (fresh) setSelectedPurchase(fresh);
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error((e as Error).message || 'Error al procesar la devolución');
+        } finally {
+            setIsVoiding(false);
+        }
+    };
 
     const handlePrintPurchase = async (purchase: Purchase) => {
         setGeneratingPdf(true);
         try {
             await PrintService.printPurchase(purchase, selectedPurchaseItems, purchase.branchId);
         } catch (e) {
-            const { toast } = await import('sonner');
             toast.error((e as Error).message);
         } finally {
             setGeneratingPdf(false);
@@ -209,6 +275,7 @@ export default function PurchasesPage() {
     if (!isOnline) return <OfflineModuleGuard moduleName="Compras"><span/></OfflineModuleGuard>;
 
     return (
+        <>
         <div className="flex-1 min-w-0 w-full max-w-full p-3 sm:p-4 md:p-6 lg:p-8 animate-in fade-in duration-500 flex flex-col space-y-4 sm:space-y-6 lg:space-y-8 bg-slate-50 dark:bg-background">
             <ModuleHeader
                 title="Compras"
@@ -689,12 +756,13 @@ export default function PurchasesPage() {
                                                 <th className="p-3 text-left">Producto</th>
                                                 <th className="p-3 text-center">Cant.</th>
                                                 <th className="p-3 text-right pr-4">Costo Unit.</th>
+                                                <th className="p-3 text-center">Acción</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                                             {selectedPurchaseItems.length === 0 && !loadingItems && (
                                                 <tr>
-                                                    <td colSpan={3} className="px-4 py-8 text-center text-[10px] font-bold text-slate-400">Sin productos registrados</td>
+                                                    <td colSpan={4} className="px-4 py-8 text-center text-[10px] font-bold text-slate-400">Sin productos registrados</td>
                                                 </tr>
                                             )}
                                             {selectedPurchaseItems.map((item, idx) => (
@@ -704,18 +772,36 @@ export default function PurchasesPage() {
                                                             <p className="font-bold text-slate-900 dark:text-white text-[11px] uppercase tracking-tight">
                                                                 {item?.productName || 'N/A'}
                                                             </p>
-                                                            <p className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
-                                                                {item?.productCode || 'S/C'}
-                                                            </p>
+                                                            {item?.returnedQuantity && item.returnedQuantity > 0 ? (
+                                                                <p className="text-[9px] font-black text-amber-500 uppercase mt-0.5">Devolución: {item.returnedQuantity}</p>
+                                                            ) : (
+                                                                <p className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                                                                    {item?.productCode || 'S/C'}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="p-3 text-center">
-                                                        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                                                            {item?.quantity ?? 0}
+                                                        <span className={clsx("text-[11px] font-bold bg-blue-500/10 px-2 py-0.5 rounded", (item?.quantity || 0) === (item?.returnedQuantity || 0) ? "text-slate-400" : "text-blue-600 dark:text-blue-400")}>
+                                                            {(item?.quantity || 0) - (item?.returnedQuantity || 0)}
                                                         </span>
+                                                        {item?.returnedQuantity && item.returnedQuantity > 0 ? (
+                                                            <span className="block text-[10px] text-slate-400 line-through mt-1">{item.quantity}</span>
+                                                        ) : null}
                                                     </td>
                                                     <td className="p-3 text-right pr-4 font-mono font-bold text-[11px] text-slate-600 dark:text-slate-300">
                                                         Bs. {item?.cost?.toFixed(2) ?? '0.00'}
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        {selectedPurchase.status !== 'RETURNED' && ((item?.quantity || 0) - (item?.returnedQuantity || 0) > 0) && (
+                                                            <button 
+                                                                onClick={() => promptReturnItem(selectedPurchase, idx)} 
+                                                                className="px-3 py-1 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-100 dark:hover:bg-amber-500/20 hover:scale-105 transition-all active:scale-95"
+                                                                title="Devolver Producto al Proveedor"
+                                                            >
+                                                                Devolver
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -723,7 +809,7 @@ export default function PurchasesPage() {
                                         <tfoot className="bg-slate-50/80 dark:bg-white/3 border-t border-slate-200 dark:border-white/10">
                                             <tr>
                                                 <td colSpan={2} className="p-4 text-right text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Total</td>
-                                                <td className="p-4 text-right pr-4 text-lg font-black text-slate-900 dark:text-white tabular-nums">
+                                                <td colSpan={2} className="p-4 text-right pr-4 text-lg font-black text-slate-900 dark:text-white tabular-nums">
                                                     <span className="text-xs mr-1 text-slate-400">Bs</span>
                                                     {selectedPurchase.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                                 </td>
@@ -762,6 +848,51 @@ export default function PurchasesPage() {
                 document.body
             )}
         </div>
+        
+            {/* Void / Return Modal - Portal */}
+            {voidModal.isOpen && voidModal.purchase && typeof document !== 'undefined' && createPortal(
+                <div onClick={closeVoidModal} className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-background rounded-[28px] w-full max-w-sm shadow-[0_32px_128px_-20px_rgba(0,0,0,0.8)] overflow-hidden border border-white/10 flex flex-col scale-in-center relative">
+                        <button onClick={closeVoidModal} className="absolute top-3 right-3 p-2 hover:bg-black/10 dark:hover:bg-white/10 rounded-xl transition-all z-10"><X size={16} className="text-slate-400" /></button>
+                        <div className="bg-amber-500/5 p-8 flex flex-col items-center text-center">
+                            <div className="w-16 h-16 rounded-3xl flex items-center justify-center mb-6 shadow-2xl rotate-3 bg-amber-500 text-white"><AlertTriangle size={32} /></div>
+                            <h3 className="text-xl font-black uppercase tracking-tighter mb-2 text-amber-500">Reversión de Compra</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium px-4 leading-relaxed">Se registrará una devolución al proveedor. Esta acción ajustará el inventario y generará saldo a favor.</p>
+                        </div>
+                        <div className="p-8 space-y-4">
+                            {voidModal.itemIndex !== undefined && selectedPurchaseItems?.[voidModal.itemIndex] && (
+                                <div className="mb-4">
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 px-1">Cantidad a devolver <span className="text-rose-500">*</span></label>
+                                    <input 
+                                        type="number" 
+                                        min={1} 
+                                        max={(selectedPurchaseItems?.[voidModal.itemIndex]?.quantity || 0) - (selectedPurchaseItems?.[voidModal.itemIndex]?.returnedQuantity || 0)} 
+                                        value={voidItemQty}
+                                        onChange={(e) => {
+                                            const max = (selectedPurchaseItems?.[voidModal.itemIndex!]?.quantity || 0) - (selectedPurchaseItems?.[voidModal.itemIndex!]?.returnedQuantity || 0);
+                                            let val = parseInt(e.target.value);
+                                            if (isNaN(val)) val = 1;
+                                            if (val < 1) val = 1;
+                                            if (val > max) val = max;
+                                            setVoidItemQty(val);
+                                        }}
+                                        className="w-full bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-2xl p-4 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                                    />
+                                    <p className="text-[10px] text-slate-500 mt-2 px-1">Máximo disponible: {(selectedPurchaseItems?.[voidModal.itemIndex]?.quantity || 0) - (selectedPurchaseItems?.[voidModal.itemIndex]?.returnedQuantity || 0)}</p>
+                                </div>
+                            )}
+                            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2.5 px-1">Motivo de Devolución <span className="text-rose-500">*</span></label>
+                            <textarea value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Indique el motivo de la devolución..." className="w-full bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/10 rounded-2xl p-4 text-xs dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-amber-500 resize-none h-28 outline-none transition-all" autoFocus />
+                        </div>
+                        <div className="p-6 pt-0 flex gap-3">
+                            <button onClick={closeVoidModal} className="flex-1 py-4 bg-slate-100 dark:bg-white/5 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Cancelar</button>
+                            <button onClick={confirmVoidAction} disabled={!voidReason.trim() || isVoiding} className="flex-[1.5] py-4 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 flex justify-center items-center shadow-xl bg-amber-500 shadow-amber-500/20">Ejecutar</button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+        </>
     );
 }
 

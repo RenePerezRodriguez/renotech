@@ -17,6 +17,7 @@ import ModuleHeader from '@/components/common/ModuleHeader';
 import NumericInput from '@/components/common/NumericInput';
 import ConfirmModal from '@/components/common/ConfirmModal';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { searchProducts } from '@/utils/searchProducts';
 
 interface CartLine {
     productId: string;
@@ -78,14 +79,9 @@ export default function NuevoPedidoPage() {
 
     const filteredProducts = useMemo(() => {
         if (!destinationId) return [];
-        const q = search.trim().toLowerCase();
         const list = products.filter(p => p.branchId === destinationId);
-        if (!q) return list.slice(0, 80);
-        return list.filter(p =>
-            (p.nombre || '').toLowerCase().includes(q) ||
-            (p.codigo || '').toLowerCase().includes(q) ||
-            (p.codigoOE || '').toLowerCase().includes(q)
-        ).slice(0, 80);
+        if (!search.trim()) return list.slice(0, 80);
+        return searchProducts(list, search, 80);
     }, [products, destinationId, search]);
 
     const addToCart = (productId: string) => {

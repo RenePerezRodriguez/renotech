@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Empresa, SupplierAccount, Branch } from '@/types';
-import { CrossBranchInventoryService, CrossBranchProduct } from '@/services/CrossBranchInventoryService';
+import { Empresa, SupplierAccount, Branch, Product } from '@/types';
 import { DevolucionProveedorService, DevolucionItem } from '@/services/DevolucionProveedorService';
 import { BranchService } from '@/services/BranchService';
+import { useProducts } from '@/hooks/useProducts';
+import { searchProducts } from '@/utils/searchProducts';
 import IndustrialModal from '@/components/common/IndustrialModal';
 import { Undo2, Save, Search, Trash2, Building2, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBranch } from '@/contexts/BranchContext';
+import clsx from 'clsx';
 
 interface Props {
     isOpen: boolean;
@@ -19,6 +22,7 @@ interface Props {
 
 export default function DevolucionProveedorModal({ isOpen, onClose, empresa, accounts }: Props) {
     const { user } = useAuth();
+    const { currentBranch } = useBranch();
     const [step, setStep] = useState<1 | 2>(1);
     const [branches, setBranches] = useState<Branch[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState<string>('');
@@ -26,8 +30,11 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
     
     // Búsqueda
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState<CrossBranchProduct[]>([]);
+    const [searchResults, setSearchResults] = useState<Product[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    
+    // Productos locales para búsqueda instantánea
+    const { products } = useProducts(selectedBranchId || 'ALL');
     
     // Items
     const [items, setItems] = useState<DevolucionItem[]>([]);
@@ -45,7 +52,10 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
         }
         BranchService.getActive().then(b => {
             setBranches(b);
-            if (b.length > 0 && !selectedBranchId) setSelectedBranchId(b[0].id!);
+            if (b.length > 0 && !selectedBranchId) {
+                const defaultBranch = b.find(branch => branch.id === currentBranch?.id) || b[0];
+                setSelectedBranchId(defaultBranch.id!);
+            }
         });
         if (accounts.length > 0 && !selectedAccountId) {
             setSelectedAccountId(accounts[0].id!);
@@ -58,17 +68,14 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
             setSearchResults([]);
             return;
         }
-        const timer = setTimeout(() => {
-            setIsSearching(true);
-            CrossBranchInventoryService.searchInBranch(selectedBranchId, searchTerm)
-                .then(res => setSearchResults(res.filter(p => (p.stock || 0) > 0).slice(0, 10)))
-                .catch(() => setSearchResults([]))
-                .finally(() => setIsSearching(false));
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchTerm, selectedBranchId]);
+        setIsSearching(true);
+        // Búsqueda instantánea en memoria sin debounce
+        const results = searchProducts(products, searchTerm, 10);
+        setSearchResults(results.filter(p => p.branchId === selectedBranchId));
+        setIsSearching(false);
+    }, [searchTerm, selectedBranchId, products]);
 
-    const addItem = (prod: CrossBranchProduct) => {
+    const addItem = (prod: Product) => {
         if (items.some(it => it.productId === prod.id)) {
             toast.error('El producto ya está en la lista');
             return;
@@ -166,11 +173,8 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
                                     <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <select
                                         value={selectedBranchId}
-                                        onChange={e => {
-                                            setSelectedBranchId(e.target.value);
-                                            setItems([]); // Clear items if branch changes
-                                        }}
-                                        className="w-full pl-9 pr-4 py-3 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none text-sm font-bold appearance-none"
+                                        disabled
+                                        className="w-full pl-9 pr-4 py-3 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 outline-none text-sm font-bold appearance-none opacity-70 cursor-not-allowed"
                                     >
                                         <option value="" disabled>Selecciona sucursal</option>
                                         {branches.map(b => (
@@ -187,8 +191,8 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
                                     <Undo2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <select
                                         value={selectedAccountId}
-                                        onChange={e => setSelectedAccountId(e.target.value)}
-                                        className="w-full pl-9 pr-4 py-3 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 focus:border-amber-500 outline-none text-sm font-bold appearance-none"
+                                        disabled
+                                        className="w-full pl-9 pr-4 py-3 rounded-xl bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 outline-none text-sm font-bold appearance-none opacity-70 cursor-not-allowed"
                                     >
                                         <option value="" disabled>Selecciona cuenta</option>
                                         {accounts.map(a => (
@@ -227,7 +231,13 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
                                             key={p.id}
                                             type="button"
                                             onClick={() => addItem(p)}
-                                            className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center justify-between border-b border-slate-100 dark:border-white/5 last:border-0"
+                                            disabled={(p.stock || 0) <= 0}
+                                            className={clsx(
+                                                "w-full text-left px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-white/5 last:border-0",
+                                                (p.stock || 0) <= 0 
+                                                    ? "opacity-50 cursor-not-allowed bg-slate-50 dark:bg-white/5" 
+                                                    : "hover:bg-slate-50 dark:hover:bg-white/5"
+                                            )}
                                         >
                                             <div className="min-w-0 flex-1 pr-4">
                                                 <p className="text-[10px] text-amber-500 font-black">{p.codigo}</p>
@@ -235,7 +245,11 @@ export default function DevolucionProveedorModal({ isOpen, onClose, empresa, acc
                                             </div>
                                             <div className="shrink-0 text-right">
                                                 <p className="text-[10px] text-slate-400">Stock</p>
-                                                <p className="text-sm font-black">{p.stock}</p>
+                                                {(p.stock || 0) <= 0 ? (
+                                                    <p className="text-sm font-black text-red-500">Sin Stock</p>
+                                                ) : (
+                                                    <p className="text-sm font-black">{p.stock}</p>
+                                                )}
                                             </div>
                                         </button>
                                     ))}

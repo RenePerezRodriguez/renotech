@@ -163,6 +163,7 @@ export interface SaleItem {
     subtotal: number;
     costAtSale?: number;     // Hydrated server-side in SaleService.createSale (FIFO Architecture)
     isVoided?: boolean;
+    returnedQuantity?: number;
     discountType?: 'PERCENTAGE' | 'FIXED_PRICE';
     discountValue?: number;
     originalPrice?: number;
@@ -449,6 +450,7 @@ export interface PurchaseItem {
     quantity: number;
     cost: number; // Unit Cost
     subtotal?: number;
+    returnedQuantity?: number;
     unit?: string; // e.g. "CAJA", "PACK"
 }
 
@@ -460,7 +462,7 @@ export interface Purchase {
     items?: PurchaseItem[];
     itemCount?: number;
     total: number;
-    status: 'RECEIVED' | 'PENDING';
+    status: 'RECEIVED' | 'PENDING' | 'PARTIALLY_RETURNED' | 'RETURNED';
     notes?: string;
     branchId: string; // Mandatory for data isolation
     usuarioId?: string;

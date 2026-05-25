@@ -345,5 +345,136 @@ export const PurchaseService = {
             ...doc.data(),
             date: (doc.data().date as Timestamp).toDate()
         })) as Purchase[];
+    },
+
+    // Void Purchase Item (Partial Return)
+    voidPurchaseItem: async (purchaseId: string, itemId: string, qtyToReturn: number, reason: string, adminInfo: { uid: string, email: string, branchId: string, name?: string }) => {
+        try {
+            const purchaseRef = doc(db, PURCHASE_COLLECTION, purchaseId);
+            const purchaseSnap = await getDoc(purchaseRef);
+            if (!purchaseSnap.exists()) throwStandardError('PURCH_NOT_FOUND');
+            const purchaseData = purchaseSnap.data() as Purchase;
+
+            if (purchaseData.status === 'RETURNED') throwStandardError('POS_VOID_ALREADY_PROCESSED', 'Compra ya devuelta completamente');
+
+            const itemRef = doc(db, `${PURCHASE_COLLECTION}/${purchaseId}/items`, itemId);
+            const itemSnap = await getDoc(itemRef);
+            if (!itemSnap.exists()) throwStandardError('SYS_DOCUMENT_NOT_FOUND', "Ítem de compra");
+            const item = itemSnap.data() as import('@/types').PurchaseItem;
+            
+            const returnedQty = item.returnedQuantity || 0;
+            const availableQty = item.quantity - returnedQty;
+            if (qtyToReturn <= 0 || qtyToReturn > availableQty) {
+                throwStandardError('INV_INVALID_ADJUSTMENT', 'La cantidad a devolver es inválida');
+            }
+
+            const totalValue = Number((qtyToReturn * item.cost).toFixed(2));
+            const newReturnedQty = returnedQty + qtyToReturn;
+            const isFullyReturned = newReturnedQty >= item.quantity;
+            
+            const accRef = purchaseData.supplierId ? doc(db, SUPPLIER_ACCOUNT_COLLECTION, purchaseData.supplierId) : null;
+            let empresaId = '';
+            
+            await runTransaction(db, async (tx) => {
+                let accSnap = null;
+                let empresaRef = null;
+                let empresaSnap = null;
+                
+                if (accRef) {
+                    accSnap = await tx.get(accRef);
+                    if (accSnap.exists()) {
+                        const accData = accSnap.data();
+                        if (accData.empresaId) {
+                            empresaId = accData.empresaId;
+                            empresaRef = doc(db, 'empresas', empresaId);
+                            empresaSnap = await tx.get(empresaRef);
+                        }
+                    }
+                }
+
+                const productRef = doc(db, PRODUCT_COLLECTION, item.productId);
+                const productSnap = await tx.get(productRef);
+                if (!productSnap.exists()) throwStandardError('INV_PRODUCT_NOT_FOUND');
+                
+                const currentStock = productSnap.data().stock || 0;
+                if (currentStock < qtyToReturn) throwStandardError('INV_INSUFFICIENT_STOCK', `Stock insuficiente para devolución (Disp: ${currentStock})`);
+                
+                tx.update(itemRef, { returnedQuantity: newReturnedQty });
+                
+                const prevTotal = purchaseData.total || 0;
+                const newTotal = Math.max(0, prevTotal - totalValue);
+                const newStatus = newTotal <= 0 && isFullyReturned ? 'RETURNED' : 'PARTIALLY_RETURNED';
+                
+                tx.update(purchaseRef, { 
+                    total: Number(newTotal.toFixed(2)),
+                    status: newStatus,
+                    updatedAt: serverTimestamp() 
+                });
+
+                const newStock = currentStock - qtyToReturn;
+                tx.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
+                
+                const movRef = doc(collection(db, 'movimientos'));
+                tx.set(movRef, {
+                    productId: item.productId,
+                    masterId: productSnap.data().masterId || item.productId,
+                    branchId: purchaseData.branchId,
+                    type: 'GARANTIA_SALIDA',
+                    quantity: -qtyToReturn,
+                    currentStock: newStock,
+                    previousStock: currentStock,
+                    reason: `Devolución Compra #${purchaseId.slice(-6).toUpperCase()} — ${purchaseData.supplierName}: ${reason}`,
+                    referenceId: purchaseId,
+                    date: serverTimestamp(),
+                    userId: adminInfo.uid,
+                    userName: adminInfo.name || adminInfo.email,
+                    createdAt: serverTimestamp()
+                } as InventoryMovement);
+
+                if (accRef && accSnap?.exists()) {
+                    tx.update(accRef, { saldo: increment(-totalValue), updatedAt: serverTimestamp() });
+                    if (empresaRef && empresaSnap?.exists()) {
+                        tx.update(empresaRef, { saldoTotal: increment(-totalValue), updatedAt: serverTimestamp() });
+                    }
+                }
+
+                const devCol = collection(db, 'devoluciones_proveedor');
+                const devRef = doc(devCol);
+                
+                tx.set(devRef, {
+                    proveedorNombre: purchaseData.supplierName,
+                    empresaId: empresaId,
+                    accountId: purchaseData.supplierId,
+                    fecha: serverTimestamp(),
+                    items: [{
+                        masterId: productSnap.data().masterId || item.productId,
+                        productCode: item.productCode || '',
+                        productName: item.productName,
+                        quantity: qtyToReturn,
+                        cost: item.cost,
+                        total: totalValue,
+                        productId: item.productId
+                    }],
+                    itemCount: 1,
+                    totalUnits: qtyToReturn,
+                    totalValue: totalValue,
+                    motivo: reason,
+                    branchId: purchaseData.branchId,
+                    branchName: purchaseData.branchId,
+                    status: 'COMPLETADO',
+                    usuarioId: adminInfo.uid,
+                    usuarioNombre: adminInfo.name || adminInfo.email,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
+            });
+
+            if (adminInfo) {
+                await logAdminAction(adminInfo.uid, adminInfo.email, 'VOID_PURCHASE_ITEM', itemId, adminInfo.branchId, `Devolución de ${qtyToReturn} unid. en Compra #${purchaseId.slice(-6)} (Motivo: ${reason})`);
+            }
+            return true;
+        } catch (e) {
+            throw e;
+        }
     }
 };
