@@ -142,11 +142,12 @@ export default function ClientForm({
                 <div>
                     <label className="flex items-center gap-2 text-[9px] font-black text-purple-500 dark:text-purple-400 uppercase tracking-[0.25em] mb-1.5 ml-1">
                         <span>Línea de Crédito (Bs.) — 0 = sin crédito</span>
-                        <Info
-                            size={12}
-                            className="text-purple-500 hover:text-purple-400 cursor-help"
-                            title="En esta versión, 0 también actúa como 'sin límite explícito' en la validación actual. Para restringir ventas a crédito, asigna un monto mayor a 0."
-                        />
+                        <span title="En esta versión, 0 también actúa como 'sin límite explícito' en la validación actual. Para restringir ventas a crédito, asigna un monto mayor a 0.">
+                            <Info
+                                size={12}
+                                className="text-purple-500 hover:text-purple-400 cursor-help"
+                            />
+                        </span>
                     </label>
                     <input
                         name="lineaDeCredito"
