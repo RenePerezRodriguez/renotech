@@ -396,6 +396,7 @@ export default function GlobalProductSearch({ isOpen, onClose }: Props) {
                                             <li
                                                 key={p.id}
                                                 onMouseEnter={() => setSelected(idx)}
+                                                onClick={() => openKardex(p.id, p.nombre, p.codigo, p.stock, p.minStock, p.unidad || 'pz', p.precio)}
                                                 className={clsx(
                                                     'mx-2 my-0.5 rounded-2xl border transition-all cursor-pointer',
                                                     isActive
@@ -496,7 +497,7 @@ export default function GlobalProductSearch({ isOpen, onClose }: Props) {
                                                             <BarChart3 size={11} /> Kardex
                                                         </button>
                                                         <button
-                                                            onClick={() => goToInventory(p.id, p.codigo)}
+                                                            onClick={(e) => { e.stopPropagation(); goToInventory(p.id, p.codigo); }}
                                                             className="flex items-center gap-1.5 h-7 px-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 text-[9px] font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-white/10 transition-colors active:scale-95"
                                                         >
                                                             <Package size={11} /> Inventario
