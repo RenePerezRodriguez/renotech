@@ -372,73 +372,83 @@ function ApprovalsTab({
 
 }) {
 
+    const [view, setView] = useState<'pending' | 'history'>('pending');
+
     const [items, setItems] = useState<OperationalExpense[]>([]);
 
     const [loading, setLoading] = useState(true);
 
     const [busyId, setBusyId] = useState<string | null>(null);
 
+    const [search, setSearch] = useState('');
+
+    const [dateFrom, setDateFrom] = useState('');
+
+    const [dateTo, setDateTo] = useState('');
 
 
-    // Realtime: escucha cambios en gastos_operativos PENDING_APPROVAL
 
     useEffect(() => {
 
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- loading flag mientras llega el primer snapshot
-
         setLoading(true);
 
-        const constraints = [where('status', '==', 'PENDING_APPROVAL'), orderBy('createdAt', 'desc')];
+        if (view === 'pending') {
 
-        if (branchId) constraints.unshift(where('branchId', '==', branchId));
+            const constraints = [where('status', '==', 'PENDING_APPROVAL'), orderBy('createdAt', 'desc')];
 
-        const q = query(collection(db, 'gastos_operativos'), ...constraints);
+            if (branchId) constraints.unshift(where('branchId', '==', branchId));
 
-        const unsub = onSnapshot(
+            const q = query(collection(db, 'gastos_operativos'), ...constraints);
 
-            q,
+            const unsub = onSnapshot(q,
 
-            snap => {
+                snap => {
 
-                const data = snap.docs.map(d => {
+                    const data = snap.docs.map(d => { const raw = d.data(); return { id: d.id, ...raw, date: raw.date?.toDate?.() || raw.date, createdAt: raw.createdAt?.toDate?.() || raw.createdAt } as OperationalExpense; });
 
-                    const raw = d.data();
+                    setItems(data); setLoading(false);
 
-                    return {
+                },
 
-                        id: d.id,
+                err => { console.error('ApprovalsTab snapshot:', err); toast.error('Error en tiempo real: ' + err.message); setLoading(false); }
 
-                        ...raw,
+            );
 
-                        date: raw.date?.toDate?.() || raw.date,
+            return () => unsub();
 
-                        createdAt: raw.createdAt?.toDate?.() || raw.createdAt
+        } else {
 
-                    } as OperationalExpense;
+            const constraints = [where('status', 'in', ['ACTIVE', 'REJECTED'])];
 
-                });
+            if (branchId) constraints.unshift(where('branchId', '==', branchId));
 
-                setItems(data);
+            const q = query(collection(db, 'gastos_operativos'), ...constraints);
 
-                setLoading(false);
+            const unsub = onSnapshot(q,
 
-            },
+                snap => {
 
-            err => {
+                    const data = snap.docs
 
-                console.error('ApprovalsTab snapshot:', err);
+                        .map(d => { const raw = d.data(); return { id: d.id, ...raw, date: raw.date?.toDate?.() || raw.date, createdAt: raw.createdAt?.toDate?.() || raw.createdAt } as OperationalExpense; })
 
-                toast.error('Error en tiempo real: ' + err.message);
+                        .filter(e => e.approvedBy || e.rejectedBy)
 
-                setLoading(false);
+                        .sort((a, b) => { const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : 0; const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : 0; return tb - ta; });
 
-            }
+                    setItems(data); setLoading(false);
 
-        );
+                },
 
-        return () => unsub();
+                err => { console.error('ApprovalsTab history snapshot:', err); toast.error('Error en tiempo real: ' + err.message); setLoading(false); }
 
-    }, [branchId]);
+            );
+
+            return () => unsub();
+
+        }
+
+    }, [branchId, view]);
 
 
 
@@ -532,23 +542,43 @@ function ApprovalsTab({
 
 
 
+    const filtered = items.filter(exp => {
+
+        if (search.trim()) {
+
+            const s = search.trim().toLowerCase();
+
+            if (!(exp.description || '').toLowerCase().includes(s) && !(exp.category || '').toLowerCase().includes(s) && !(exp.userName || '').toLowerCase().includes(s)) return false;
+
+        }
+
+        if (dateFrom && exp.createdAt instanceof Date && exp.createdAt < new Date(dateFrom + 'T00:00:00')) return false;
+
+        if (dateTo && exp.createdAt instanceof Date && exp.createdAt > new Date(dateTo + 'T23:59:59')) return false;
+
+        return true;
+
+    });
+
+
+
     return (
 
         <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
 
                 <div>
 
                     <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
 
-                        Solicitudes de Gasto Pendientes
+                        Gastos Operativos
 
                     </h2>
 
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
 
-                        Cajeros que solicitaron registrar gastos sobre el umbral
+                        {view === 'pending' ? 'Cajeros que solicitaron registrar gastos sobre el umbral' : 'Gastos ya aprobados o rechazados'}
 
                     </p>
 
@@ -564,19 +594,55 @@ function ApprovalsTab({
 
 
 
+            <SegmentedToggle
+
+                value={view}
+
+                onChange={(v) => setView(v as 'pending' | 'history')}
+
+                options={[{ value: 'pending', label: 'Pendientes' }, { value: 'history', label: 'Histórico' }]}
+
+            />
+
+
+
+            <FilterBar
+
+                search={search}
+
+                onSearch={setSearch}
+
+                dateFrom={dateFrom}
+
+                dateTo={dateTo}
+
+                onDateFrom={setDateFrom}
+
+                onDateTo={setDateTo}
+
+                placeholder="Buscar por categoría, descripción o cajero…"
+
+            />
+
+
+
             {loading ? (
 
                 <div className="text-center py-12 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cargando...</div>
 
-            ) : items.length === 0 ? (
+            ) : filtered.length === 0 ? (
 
                 <div className="text-center py-16 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
 
                     <CheckCircle2 size={48} strokeWidth={1.5} className="mx-auto text-emerald-500 mb-3" />
 
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Sin solicitudes pendientes</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">
 
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Todo al día</p>
+                        {view === 'pending' ? 'Sin solicitudes pendientes' : 'Sin registros en el histórico'}
+
+                    </p>
+
+                    {view === 'pending' && <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Todo al día</p>}
 
                 </div>
 
@@ -584,7 +650,7 @@ function ApprovalsTab({
 
                 <div className="space-y-3">
 
-                    {items.map(exp => (
+                    {filtered.map(exp => (
 
                         <div key={exp.id} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
 
@@ -644,37 +710,59 @@ function ApprovalsTab({
 
                             </div>
 
-                            <div className="flex md:flex-col gap-2 self-center">
+                            {view === 'pending' ? (
 
-                                <button
+                                <div className="flex md:flex-col gap-2 self-center">
 
-                                    onClick={() => handleApprove(exp)}
+                                    <button
 
-                                    disabled={busyId === exp.id}
+                                        onClick={() => handleApprove(exp)}
 
-                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                                        disabled={busyId === exp.id}
 
-                                >
+                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
 
-                                    <CheckCircle2 size={12} strokeWidth={2.5} /> {busyId === exp.id ? 'Procesando…' : 'Aprobar'}
+                                    >
 
-                                </button>
+                                        <CheckCircle2 size={12} strokeWidth={2.5} /> {busyId === exp.id ? 'Procesando…' : 'Aprobar'}
 
-                                <button
+                                    </button>
 
-                                    onClick={() => handleReject(exp)}
+                                    <button
 
-                                    disabled={busyId === exp.id}
+                                        onClick={() => handleReject(exp)}
 
-                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                                        disabled={busyId === exp.id}
 
-                                >
+                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
 
-                                    <XCircle size={12} strokeWidth={2.5} /> Rechazar
+                                    >
 
-                                </button>
+                                        <XCircle size={12} strokeWidth={2.5} /> Rechazar
 
-                            </div>
+                                    </button>
+
+                                </div>
+
+                            ) : (
+
+                                <div className="flex flex-col items-end gap-1 self-center min-w-28">
+
+                                    <span className={clsx('px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest', exp.status === 'ACTIVE' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-700 dark:text-rose-400')}>
+
+                                        {exp.status === 'ACTIVE' ? 'Aprobado' : 'Rechazado'}
+
+                                    </span>
+
+                                    {exp.approvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {exp.approvedByName}</span>}
+
+                                    {exp.rejectedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {exp.rejectedByName}</span>}
+
+                                    {exp.rejectionReason && <span className="text-[9px] text-rose-500 font-bold text-right">{exp.rejectionReason}</span>}
+
+                                </div>
+
+                            )}
 
                         </div>
 
@@ -708,6 +796,8 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
 
     const [discountThreshold, setDiscountThreshold] = useState('15');
 
+    const [discountHardBlock, setDiscountHardBlock] = useState('30');
+
     const [saving, setSaving] = useState(false);
 
 
@@ -723,6 +813,8 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
         setAllowExpenses(config.allowRetroactiveExpenses === true);
 
         setDiscountThreshold(String(config.discountApprovalThresholdPercent ?? 15));
+
+        setDiscountHardBlock(String(config.discountHardBlockThresholdPercent ?? 30));
 
     }, [config]);
 
@@ -753,6 +845,8 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
                 allowRetroactiveExpenses: allowExpenses,
 
                 discountApprovalThresholdPercent: Math.max(0, Math.min(100, parseFloat(discountThreshold) || 0)),
+
+                discountHardBlockThresholdPercent: Math.max(0, Math.min(100, parseFloat(discountHardBlock) || 0)),
 
                 updatedAt: new Date()
 
@@ -868,7 +962,21 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
 
                         onChange={setDiscountThreshold}
 
-                        hint="Descuentos por encima de este % se envían a la bandeja de aprobación. Aplica a TODOS los roles."
+                        hint="Descuentos por encima de este % se envían a la bandeja de revisión post-venta."
+
+                    />
+
+                    <NumberField
+
+                        label="% Descuento que bloquea el POS"
+
+                        suffix="%"
+
+                        value={discountHardBlock}
+
+                        onChange={setDiscountHardBlock}
+
+                        hint="Descuentos por encima de este % bloquean el POS hasta que el GERENTE apruebe en tiempo real."
 
                     />
 
@@ -1156,11 +1264,19 @@ function VoidApprovalsTab({
 
 }) {
 
+    const [view, setView] = useState<'pending' | 'history'>('pending');
+
     const [items, setItems] = useState<PendingVoidApproval[]>([]);
 
     const [loading, setLoading] = useState(true);
 
     const [busyId, setBusyId] = useState<string | null>(null);
+
+    const [search, setSearch] = useState('');
+
+    const [dateFrom, setDateFrom] = useState('');
+
+    const [dateTo, setDateTo] = useState('');
 
 
 
@@ -1170,7 +1286,11 @@ function VoidApprovalsTab({
 
         setLoading(true);
 
-        const constraints = [where('status', '==', 'PENDING'), orderBy('requestedAt', 'desc')];
+        const statusFilter = view === 'pending' ? where('status', '==', 'PENDING') : where('status', 'in', ['APPROVED', 'REJECTED']);
+
+        const orderC = view === 'pending' ? [orderBy('requestedAt', 'desc')] : [];
+
+        const constraints = [statusFilter, ...orderC];
 
         if (branchId) constraints.unshift(where('branchId', '==', branchId));
 
@@ -1182,7 +1302,7 @@ function VoidApprovalsTab({
 
             snap => {
 
-                const data = snap.docs.map(d => {
+                let data = snap.docs.map(d => {
 
                     const raw = d.data();
 
@@ -1201,6 +1321,20 @@ function VoidApprovalsTab({
                     } as unknown as PendingVoidApproval;
 
                 });
+
+                if (view === 'history') {
+
+                    data = data.sort((a, b) => {
+
+                        const ta = a.approvedAt instanceof Date ? a.approvedAt.getTime() : a.requestedAt instanceof Date ? a.requestedAt.getTime() : 0;
+
+                        const tb = b.approvedAt instanceof Date ? b.approvedAt.getTime() : b.requestedAt instanceof Date ? b.requestedAt.getTime() : 0;
+
+                        return tb - ta;
+
+                    });
+
+                }
 
                 setItems(data);
 
@@ -1222,7 +1356,7 @@ function VoidApprovalsTab({
 
         return () => unsub();
 
-    }, [branchId]);
+    }, [branchId, view]);
 
 
 
@@ -1316,23 +1450,45 @@ function VoidApprovalsTab({
 
 
 
+    const voidFiltered = items.filter(req => {
+
+        if (search.trim()) {
+
+            const s = search.trim().toLowerCase();
+
+            if (!String(req.saleShortId || '').toLowerCase().includes(s) && !(req.reason || '').toLowerCase().includes(s) && !(req.requestedByName || '').toLowerCase().includes(s)) return false;
+
+        }
+
+        const refDate = req.requestedAt instanceof Date ? req.requestedAt : undefined;
+
+        if (dateFrom && refDate && refDate < new Date(dateFrom + 'T00:00:00')) return false;
+
+        if (dateTo && refDate && refDate > new Date(dateTo + 'T23:59:59')) return false;
+
+        return true;
+
+    });
+
+
+
     return (
 
         <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
 
                 <div>
 
                     <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
 
-                        Anulaciones de Venta Pendientes
+                        Devoluciones / Anulaciones
 
                     </h2>
 
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
 
-                        Cajeros que pidieron anular ventas de turnos cerrados
+                        {view === 'pending' ? 'Cajeros que pidieron anular ventas de turnos cerrados' : 'Anulaciones ya aprobadas o rechazadas'}
 
                     </p>
 
@@ -1348,17 +1504,53 @@ function VoidApprovalsTab({
 
 
 
+            <SegmentedToggle
+
+                value={view}
+
+                onChange={(v) => setView(v as 'pending' | 'history')}
+
+                options={[{ value: 'pending', label: 'Pendientes' }, { value: 'history', label: 'Histórico' }]}
+
+            />
+
+
+
+            <FilterBar
+
+                search={search}
+
+                onSearch={setSearch}
+
+                dateFrom={dateFrom}
+
+                dateTo={dateTo}
+
+                onDateFrom={setDateFrom}
+
+                onDateTo={setDateTo}
+
+                placeholder="Buscar por venta, motivo o cajero…"
+
+            />
+
+
+
             {loading ? (
 
                 <div className="text-center py-12 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cargando...</div>
 
-            ) : items.length === 0 ? (
+            ) : voidFiltered.length === 0 ? (
 
                 <div className="text-center py-16 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
 
                     <CheckCircle2 size={48} strokeWidth={1.5} className="mx-auto text-emerald-500 mb-3" />
 
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Sin anulaciones pendientes</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">
+
+                        {view === 'pending' ? 'Sin anulaciones pendientes' : 'Sin registros en el histórico'}
+
+                    </p>
 
                 </div>
 
@@ -1366,7 +1558,7 @@ function VoidApprovalsTab({
 
                 <div className="space-y-3">
 
-                    {items.map(req => (
+                    {voidFiltered.map(req => (
 
                         <div key={req.id} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
 
@@ -1408,37 +1600,57 @@ function VoidApprovalsTab({
 
                             </div>
 
-                            <div className="flex md:flex-col gap-2 self-center">
+                            {view === 'pending' ? (
 
-                                <button
+                                <div className="flex md:flex-col gap-2 self-center">
 
-                                    onClick={() => handleApprove(req)}
+                                    <button
 
-                                    disabled={busyId === req.id}
+                                        onClick={() => handleApprove(req)}
 
-                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50"
+                                        disabled={busyId === req.id}
 
-                                >
+                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50"
 
-                                    <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
+                                    >
 
-                                </button>
+                                        <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
 
-                                <button
+                                    </button>
 
-                                    onClick={() => handleReject(req)}
+                                    <button
 
-                                    disabled={busyId === req.id}
+                                        onClick={() => handleReject(req)}
 
-                                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
+                                        disabled={busyId === req.id}
 
-                                >
+                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
 
-                                    <XCircle size={12} strokeWidth={2.5} /> Rechazar
+                                    >
 
-                                </button>
+                                        <XCircle size={12} strokeWidth={2.5} /> Rechazar
 
-                            </div>
+                                    </button>
+
+                                </div>
+
+                            ) : (
+
+                                <div className="flex flex-col items-end gap-1 self-center min-w-28">
+
+                                    <span className={clsx('px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest', req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-700 dark:text-rose-400')}>
+
+                                        {req.status === 'APPROVED' ? 'Aprobada' : 'Rechazada'}
+
+                                    </span>
+
+                                    {req.approvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {req.approvedByName}</span>}
+
+                                    {req.approvedAt instanceof Date && <span className="text-[9px] text-slate-400 font-bold">{req.approvedAt.toLocaleDateString('es-BO')}</span>}
+
+                                </div>
+
+                            )}
 
                         </div>
 
@@ -1466,29 +1678,33 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
     const { branches } = useBranch();
 
+    const [view, setView] = useState<'pending' | 'history'>('pending');
+
     const [shifts, setShifts] = useState<CashierSession[]>([]);
 
     const [loading, setLoading] = useState(true);
 
     const [busyId, setBusyId] = useState<string | null>(null);
 
+    const [search, setSearch] = useState('');
 
 
-    // Realtime: sesiones OPEN en todas las sucursales
 
     useEffect(() => {
 
         setLoading(true);
 
-        const q = query(
+        let q;
 
-            collection(db, 'cashier_sessions'),
+        if (view === 'pending') {
 
-            where('status', '==', 'OPEN'),
+            q = query(collection(db, 'cashier_sessions'), where('status', '==', 'OPEN'), orderBy('openedAt', 'asc'));
 
-            orderBy('openedAt', 'asc')
+        } else {
 
-        );
+            q = query(collection(db, 'cashier_sessions'), where('status', 'in', ['CLOSED', 'FORCE_CLOSED']));
+
+        }
 
         const unsub = onSnapshot(
 
@@ -1496,7 +1712,7 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
             snap => {
 
-                const data = snap.docs.map(d => {
+                let data = snap.docs.map(d => {
 
                     const raw = d.data();
 
@@ -1513,6 +1729,20 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
                     } as CashierSession;
 
                 });
+
+                if (view === 'history') {
+
+                    data = data.sort((a, b) => {
+
+                        const ta = a.closedAt instanceof Date ? a.closedAt.getTime() : 0;
+
+                        const tb = b.closedAt instanceof Date ? b.closedAt.getTime() : 0;
+
+                        return tb - ta;
+
+                    }).slice(0, 100);
+
+                }
 
                 setShifts(data);
 
@@ -1534,7 +1764,7 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
         return () => unsub();
 
-    }, []);
+    }, [view]);
 
 
 
@@ -1590,23 +1820,35 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
 
 
+    const shiftsFiltered = shifts.filter(s => {
+
+        if (!search.trim()) return true;
+
+        const str = search.trim().toLowerCase();
+
+        return (s.cashierName || '').toLowerCase().includes(str) || branchName(s.branchId).toLowerCase().includes(str);
+
+    });
+
+
+
     return (
 
         <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
 
                 <div>
 
                     <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
 
-                        Turnos OPEN en todas las sucursales
+                        Turnos de Caja
 
                     </h2>
 
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
 
-                        Cierre forzado para turnos abandonados
+                        {view === 'pending' ? 'Turnos OPEN — cierre forzado para turnos abandonados' : 'Últimos 100 turnos cerrados'}
 
                     </p>
 
@@ -1622,17 +1864,49 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
 
 
+            <SegmentedToggle
+
+                value={view}
+
+                onChange={(v) => setView(v as 'pending' | 'history')}
+
+                options={[{ value: 'pending', label: 'Abiertos' }, { value: 'history', label: 'Histórico' }]}
+
+            />
+
+
+
+            <input
+
+                type="text"
+
+                value={search}
+
+                onChange={e => setSearch(e.target.value)}
+
+                placeholder="Buscar por cajero o sucursal…"
+
+                className="w-full max-w-xs text-xs px-3 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+
+            />
+
+
+
             {loading ? (
 
                 <div className="text-center py-12 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cargando...</div>
 
-            ) : shifts.length === 0 ? (
+            ) : shiftsFiltered.length === 0 ? (
 
                 <div className="text-center py-16 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
 
                     <CheckCircle2 size={48} strokeWidth={1.5} className="mx-auto text-emerald-500 mb-3" />
 
-                    <p className="text-sm font-black text-slate-900 dark:text-white">No hay turnos OPEN</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">
+
+                        {view === 'pending' ? 'No hay turnos abiertos' : 'Sin turnos en el histórico'}
+
+                    </p>
 
                 </div>
 
@@ -1640,7 +1914,7 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
                 <div className="space-y-3">
 
-                    {shifts.map(s => {
+                    {shiftsFiltered.map(s => {
 
                         const openedAtDate = s.openedAt instanceof Date
 
@@ -1648,9 +1922,19 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
                             : (s.openedAt as { toDate?: () => Date })?.toDate?.() ?? new Date();
 
+                        const closedAtDate = s.closedAt instanceof Date
+
+                            ? s.closedAt
+
+                            : (s.closedAt as { toDate?: () => Date })?.toDate?.() ?? null;
+
                         const startedHrs = (Date.now() - openedAtDate.getTime()) / (1000 * 60 * 60);
 
+                        const durationHrs = closedAtDate ? (closedAtDate.getTime() - openedAtDate.getTime()) / (1000 * 60 * 60) : startedHrs;
+
                         const isLong = startedHrs > 12;
+
+                        const isForceClosed = s.status === 'FORCE_CLOSED';
 
                         return (
 
@@ -1658,7 +1942,7 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
                                 "bg-white dark:bg-white/5 border rounded-2xl p-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4",
 
-                                isLong ? "border-amber-500/40" : "border-slate-200 dark:border-white/10"
+                                view === 'pending' && isLong ? "border-amber-500/40" : "border-slate-200 dark:border-white/10"
 
                             )}>
 
@@ -1666,9 +1950,13 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
                                     <div className="flex items-center gap-2 flex-wrap">
 
-                                        <span className="px-2 py-0.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest">OPEN</span>
+                                        <span className={clsx('px-2 py-0.5 rounded-xl text-[9px] font-black uppercase tracking-widest', view === 'pending' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : isForceClosed ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400' : 'bg-slate-500/10 text-slate-600 dark:text-slate-300')}>
 
-                                        {isLong && (
+                                            {view === 'pending' ? 'OPEN' : isForceClosed ? 'Cierre Forzado' : 'Cerrado'}
+
+                                        </span>
+
+                                        {view === 'pending' && isLong && (
 
                                             <span className="px-2 py-0.5 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest">
 
@@ -1688,29 +1976,45 @@ function RemoteShiftsTab({ adminId, adminName }: { adminId: string; adminName: s
 
                                         <span className="flex items-center gap-1"><Clock size={11} /> Apertura: {openedAtDate.toLocaleString('es-BO')}</span>
 
+                                        {closedAtDate && <span className="flex items-center gap-1"><Clock size={11} /> Cierre: {closedAtDate.toLocaleString('es-BO')}</span>}
+
                                         <span>Inicial: Bs. {(s.openingTotal ?? 0).toFixed(2)}</span>
+
+                                        {view === 'history' && <span>Duración: {durationHrs.toFixed(1)}h</span>}
 
                                     </div>
 
                                 </div>
 
-                                <div className="flex md:flex-col gap-2 self-center">
+                                {view === 'pending' ? (
 
-                                    <button
+                                    <div className="flex md:flex-col gap-2 self-center">
 
-                                        onClick={() => handleForceClose(s)}
+                                        <button
 
-                                        disabled={busyId === s.id}
+                                            onClick={() => handleForceClose(s)}
 
-                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
+                                            disabled={busyId === s.id}
 
-                                    >
+                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
 
-                                        <DoorClosed size={12} strokeWidth={2.5} /> Cerrar Remoto
+                                        >
 
-                                    </button>
+                                            <DoorClosed size={12} strokeWidth={2.5} /> Cerrar Remoto
 
-                                </div>
+                                        </button>
+
+                                    </div>
+
+                                ) : (
+
+                                    <div className="self-center text-[10px] font-bold text-slate-500 text-right">
+
+                                        {(s as unknown as Record<string, string | undefined>).closedByName && <p className="text-slate-700 dark:text-slate-300">Cerrado por: {(s as unknown as Record<string, string | undefined>).closedByName}</p>}
+
+                                    </div>
+
+                                )}
 
                             </div>
 
@@ -1754,11 +2058,19 @@ function DiscountApprovalsTab({
 
     const { branches } = useBranch();
 
+    const [view, setView] = useState<'pending' | 'history'>('pending');
+
     const [items, setItems] = useState<PendingDiscountApproval[]>([]);
 
     const [loading, setLoading] = useState(true);
 
     const [busyId, setBusyId] = useState<string | null>(null);
+
+    const [search, setSearch] = useState('');
+
+    const [dateFrom, setDateFrom] = useState('');
+
+    const [dateTo, setDateTo] = useState('');
 
 
 
@@ -1766,7 +2078,11 @@ function DiscountApprovalsTab({
 
         setLoading(true);
 
-        const constraints = [where('status', '==', 'PENDING'), orderBy('requestedAt', 'desc')];
+        const statusFilter = view === 'pending' ? where('status', 'in', ['PENDING', 'BLOCKED_PENDING']) : where('status', 'in', ['APPROVED', 'REJECTED']);
+
+        const orderC = view === 'pending' ? [orderBy('requestedAt', 'desc')] : [];
+
+        const constraints = [statusFilter, ...orderC];
 
         if (branchId) constraints.unshift(where('branchId', '==', branchId));
 
@@ -1778,7 +2094,7 @@ function DiscountApprovalsTab({
 
             snap => {
 
-                const data = snap.docs.map(d => {
+                let data = snap.docs.map(d => {
 
                     const raw = d.data();
 
@@ -1795,6 +2111,20 @@ function DiscountApprovalsTab({
                     } as PendingDiscountApproval;
 
                 });
+
+                if (view === 'history') {
+
+                    data = data.sort((a, b) => {
+
+                        const ta = a.resolvedAt instanceof Date ? a.resolvedAt.getTime() : a.requestedAt instanceof Date ? a.requestedAt.getTime() : 0;
+
+                        const tb = b.resolvedAt instanceof Date ? b.resolvedAt.getTime() : b.requestedAt instanceof Date ? b.requestedAt.getTime() : 0;
+
+                        return tb - ta;
+
+                    });
+
+                }
 
                 setItems(data);
 
@@ -1816,7 +2146,7 @@ function DiscountApprovalsTab({
 
         return () => unsub();
 
-    }, [branchId]);
+    }, [branchId, view]);
 
 
 
@@ -1914,23 +2244,45 @@ function DiscountApprovalsTab({
 
 
 
+    const discountFiltered = items.filter(req => {
+
+        if (search.trim()) {
+
+            const s = search.trim().toLowerCase();
+
+            if (!(req.productName || '').toLowerCase().includes(s) && !(req.productCode || '').toLowerCase().includes(s) && !(req.cashierName || '').toLowerCase().includes(s)) return false;
+
+        }
+
+        const refDate = req.requestedAt instanceof Date ? req.requestedAt : undefined;
+
+        if (dateFrom && refDate && refDate < new Date(dateFrom + 'T00:00:00')) return false;
+
+        if (dateTo && refDate && refDate > new Date(dateTo + 'T23:59:59')) return false;
+
+        return true;
+
+    });
+
+
+
     return (
 
         <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
 
                 <div>
 
                     <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">
 
-                        Descuentos Pendientes de Revisión
+                        Descuentos sobre el Umbral
 
                     </h2>
 
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
 
-                        Cajeros aplicaron descuentos sobre el umbral configurado
+                        {view === 'pending' ? 'Cajeros aplicaron descuentos sobre el umbral configurado' : 'Descuentos ya aprobados o rechazados'}
 
                     </p>
 
@@ -1946,17 +2298,53 @@ function DiscountApprovalsTab({
 
 
 
+            <SegmentedToggle
+
+                value={view}
+
+                onChange={(v) => setView(v as 'pending' | 'history')}
+
+                options={[{ value: 'pending', label: 'Pendientes' }, { value: 'history', label: 'Histórico' }]}
+
+            />
+
+
+
+            <FilterBar
+
+                search={search}
+
+                onSearch={setSearch}
+
+                dateFrom={dateFrom}
+
+                dateTo={dateTo}
+
+                onDateFrom={setDateFrom}
+
+                onDateTo={setDateTo}
+
+                placeholder="Buscar por producto, código o cajero…"
+
+            />
+
+
+
             {loading ? (
 
                 <div className="text-center py-12 text-slate-400 text-[10px] font-bold uppercase tracking-widest">Cargando...</div>
 
-            ) : items.length === 0 ? (
+            ) : discountFiltered.length === 0 ? (
 
                 <div className="text-center py-16 bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
 
                     <CheckCircle2 size={48} strokeWidth={1.5} className="mx-auto text-emerald-500 mb-3" />
 
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Sin descuentos pendientes</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">
+
+                        {view === 'pending' ? 'Sin descuentos pendientes' : 'Sin registros en el histórico'}
+
+                    </p>
 
                 </div>
 
@@ -1964,7 +2352,7 @@ function DiscountApprovalsTab({
 
                 <div className="space-y-3">
 
-                    {items.map(req => {
+                    {discountFiltered.map(req => {
 
                         const ts = ensureDate(req.requestedAt);
 
@@ -1975,6 +2363,12 @@ function DiscountApprovalsTab({
                                 <div className="space-y-2">
 
                                     <div className="flex items-center gap-2 flex-wrap">
+
+                                        {req.hardBlock && (
+                                            <span className="px-2 py-0.5 rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[9px] font-black uppercase tracking-widest animate-pulse">
+                                                Bloqueado
+                                            </span>
+                                        )}
 
                                         <span className="px-2 py-0.5 rounded-xl bg-amber-500/10 text-amber-700 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest">
 
@@ -1996,7 +2390,7 @@ function DiscountApprovalsTab({
 
                                     <div className="flex flex-wrap gap-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
 
-                                        <span>Bs. {req.originalPrice.toFixed(2)} ? <span className="text-rose-500">Bs. {req.finalPrice.toFixed(2)}</span></span>
+                                        <span>Bs. {req.originalPrice.toFixed(2)} → <span className="text-rose-500">Bs. {req.finalPrice.toFixed(2)}</span></span>
 
                                         <span className="flex items-center gap-1"><Building2 size={11} /> {branchName(req.branchId)}</span>
 
@@ -2008,37 +2402,57 @@ function DiscountApprovalsTab({
 
                                 </div>
 
-                                <div className="flex md:flex-col gap-2 self-center">
+                                {view === 'pending' ? (
 
-                                    <button
+                                    <div className="flex md:flex-col gap-2 self-center">
 
-                                        onClick={() => handleApprove(req)}
+                                        <button
 
-                                        disabled={busyId === req.id}
+                                            onClick={() => handleApprove(req)}
 
-                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50"
+                                            disabled={busyId === req.id}
 
-                                    >
+                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50"
 
-                                        <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
+                                        >
 
-                                    </button>
+                                            <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
 
-                                    <button
+                                        </button>
 
-                                        onClick={() => handleReject(req)}
+                                        <button
 
-                                        disabled={busyId === req.id}
+                                            onClick={() => handleReject(req)}
 
-                                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
+                                            disabled={busyId === req.id}
 
-                                    >
+                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50"
 
-                                        <XCircle size={12} strokeWidth={2.5} /> Rechazar
+                                        >
 
-                                    </button>
+                                            <XCircle size={12} strokeWidth={2.5} /> Rechazar
 
-                                </div>
+                                        </button>
+
+                                    </div>
+
+                                ) : (
+
+                                    <div className="flex flex-col items-end gap-1 self-center min-w-28">
+
+                                        <span className={clsx('px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest', req.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-700 dark:text-rose-400')}>
+
+                                            {req.status === 'APPROVED' ? 'Aprobado' : 'Rechazado'}
+
+                                        </span>
+
+                                        {req.resolvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {req.resolvedByName}</span>}
+
+                                        {req.resolvedAt instanceof Date && <span className="text-[9px] text-slate-400 font-bold">{req.resolvedAt.toLocaleDateString('es-BO')}</span>}
+
+                                    </div>
+
+                                )}
 
                             </div>
 
@@ -2082,6 +2496,8 @@ function CancellationsTab({
 
     const router = useRouter();
 
+    const [view, setView] = useState<'pending' | 'history'>('pending');
+
     const [pedidos, setPedidos] = useState<Pedido[]>([]);
 
     const [envios, setEnvios] = useState<Envio[]>([]);
@@ -2098,27 +2514,43 @@ function CancellationsTab({
 
         setLoadingP(true);
 
-        const unsubP = PedidoService.subscribePendingCancellations(data => {
-
-            setPedidos(data);
-
-            setLoadingP(false);
-
-        });
-
         setLoadingE(true);
 
-        const unsubE = EnvioService.subscribePendingCancellations(data => {
+        if (view === 'pending') {
 
-            setEnvios(data);
+            const unsubP = PedidoService.subscribePendingCancellations(data => { setPedidos(data); setLoadingP(false); });
 
-            setLoadingE(false);
+            const unsubE = EnvioService.subscribePendingCancellations(data => { setEnvios(data); setLoadingE(false); });
 
-        });
+            return () => { unsubP(); unsubE(); };
 
-        return () => { unsubP(); unsubE(); };
+        } else {
 
-    }, []);
+            const qP = query(collection(db, 'pedidos'), where('status', '==', 'CANCELLED'), orderBy('createdAt', 'desc'));
+
+            const unsubP = onSnapshot(qP, snap => {
+
+                setPedidos(snap.docs.map(d => ({ codigo: d.id, ...d.data() } as Pedido)));
+
+                setLoadingP(false);
+
+            }, () => setLoadingP(false));
+
+            const qE = query(collection(db, 'envios'), where('status', '==', 'CANCELLED'), orderBy('createdAt', 'desc'));
+
+            const unsubE = onSnapshot(qE, snap => {
+
+                setEnvios(snap.docs.map(d => ({ codigo: d.id, ...d.data() } as Envio)));
+
+                setLoadingE(false);
+
+            }, () => setLoadingE(false));
+
+            return () => { unsubP(); unsubE(); };
+
+        }
+
+    }, [view]);
 
 
 
@@ -2314,7 +2746,7 @@ function CancellationsTab({
 
         <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
 
                 <div>
 
@@ -2326,7 +2758,7 @@ function CancellationsTab({
 
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
 
-                        Solicitudes pendientes de aprobación HQ
+                        {view === 'pending' ? 'Solicitudes pendientes de aprobación HQ' : 'Pedidos y envíos cancelados'}
 
                     </p>
 
@@ -2342,7 +2774,19 @@ function CancellationsTab({
 
 
 
-            {!isHQManager && (
+            <SegmentedToggle
+
+                value={view}
+
+                onChange={(v) => setView(v as 'pending' | 'history')}
+
+                options={[{ value: 'pending', label: 'Pendientes' }, { value: 'history', label: 'Histórico' }]}
+
+            />
+
+
+
+            {view === 'pending' && !isHQManager && (
 
                 <div className="p-4 rounded-xl border border-amber-300/40 bg-amber-50 dark:bg-amber-500/5 text-[11px] font-bold text-amber-800 dark:text-amber-300">
 
@@ -2364,7 +2808,11 @@ function CancellationsTab({
 
                     <CheckCircle2 size={48} strokeWidth={1.5} className="mx-auto text-emerald-500 mb-3" />
 
-                    <p className="text-sm font-black text-slate-900 dark:text-white">Sin cancelaciones pendientes</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">
+
+                        {view === 'pending' ? 'Sin cancelaciones pendientes' : 'Sin cancelaciones en el histórico'}
+
+                    </p>
 
                 </div>
 
@@ -2416,21 +2864,29 @@ function CancellationsTab({
 
                                         </div>
 
-                                        <div className="flex md:flex-col gap-2 self-center">
+                                        {view === 'pending' ? (
 
-                                            <button onClick={() => handleApprovePedido(p)} disabled={busyId === p.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50">
+                                            <div className="flex md:flex-col gap-2 self-center">
 
-                                                <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
+                                                <button onClick={() => handleApprovePedido(p)} disabled={busyId === p.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50">
 
-                                            </button>
+                                                    <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
 
-                                            <button onClick={() => handleRejectPedido(p)} disabled={busyId === p.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50">
+                                                </button>
 
-                                                <XCircle size={12} strokeWidth={2.5} /> Rechazar
+                                                <button onClick={() => handleRejectPedido(p)} disabled={busyId === p.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50">
 
-                                            </button>
+                                                    <XCircle size={12} strokeWidth={2.5} /> Rechazar
 
-                                        </div>
+                                                </button>
+
+                                            </div>
+
+                                        ) : (
+
+                                            <span className="px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest self-center">Cancelado</span>
+
+                                        )}
 
                                     </div>
 
@@ -2494,21 +2950,29 @@ function CancellationsTab({
 
                                         </div>
 
-                                        <div className="flex md:flex-col gap-2 self-center">
+                                        {view === 'pending' ? (
 
-                                            <button onClick={() => handleApproveEnvio(e)} disabled={busyId === e.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50">
+                                            <div className="flex md:flex-col gap-2 self-center">
 
-                                                <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
+                                                <button onClick={() => handleApproveEnvio(e)} disabled={busyId === e.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-50">
 
-                                            </button>
+                                                    <CheckCircle2 size={12} strokeWidth={2.5} /> Aprobar
 
-                                            <button onClick={() => handleRejectEnvio(e)} disabled={busyId === e.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50">
+                                                </button>
 
-                                                <XCircle size={12} strokeWidth={2.5} /> Rechazar
+                                                <button onClick={() => handleRejectEnvio(e)} disabled={busyId === e.codigo || !isHQManager} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-rose-600 active:scale-95 transition-all disabled:opacity-50">
 
-                                            </button>
+                                                    <XCircle size={12} strokeWidth={2.5} /> Rechazar
 
-                                        </div>
+                                                </button>
+
+                                            </div>
+
+                                        ) : (
+
+                                            <span className="px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-400 text-[10px] font-black uppercase tracking-widest self-center">Cancelado</span>
+
+                                        )}
 
                                     </div>
 

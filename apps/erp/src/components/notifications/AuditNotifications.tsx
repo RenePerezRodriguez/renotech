@@ -38,21 +38,19 @@ function tsToDate(v: unknown): Date {
 
 export default function AuditNotifications() {
     const { role } = useAuth();
-    const { currentBranch, canSwitchBranch } = useBranch();
+    const { canSwitchBranch, currentBranch } = useBranch();
     const [alerts, setAlerts] = useState<AuditAlert[]>([]);
     const [pending, setPending] = useState<PendingItem[]>([]);
     const [isOpen, setIsOpen] = useState(false);
 
     const isManager = role === 'GERENTE';
-    const canSeeAudits = isManager || canSwitchBranch;
 
     // Audit alerts (subscripción ya existente)
     useEffect(() => {
-        if (!canSeeAudits) return;
-        const filterBranch = canSwitchBranch ? 'ALL' : currentBranch?.id;
-        const unsub = AuditAlertService.subscribeToUnreadAlerts(filterBranch, setAlerts);
+        if (!isManager) return;
+        const unsub = AuditAlertService.subscribeToUnreadAlerts('ALL', setAlerts);
         return () => unsub();
-    }, [canSeeAudits, canSwitchBranch, currentBranch?.id]);
+    }, [isManager]);
 
     // Aprobaciones pendientes (solo gerente) — escucha las 3 colecciones y unifica
     useEffect(() => {
@@ -183,7 +181,7 @@ export default function AuditNotifications() {
         } catch { return date.toLocaleDateString('es-BO', { timeZone: 'America/La_Paz' }); }
     };
 
-    if (!canSeeAudits) return null;
+    if (!isManager) return null;
 
     const totalBadge = pending.length + alerts.length;
 

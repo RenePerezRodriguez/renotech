@@ -1,5 +1,5 @@
 import { db } from '@/lib/firebase';
-import { collection, addDoc, doc, getDoc, getDocs, query, where, orderBy, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, getDocs, query, where, orderBy, updateDoc, onSnapshot, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { logAdminAction } from '@/lib/audit';
 import { PendingDiscountApproval } from '@/types';
 
@@ -69,7 +69,7 @@ export const DiscountApprovalService = {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error('Solicitud no encontrada.');
         const data = snap.data() as PendingDiscountApproval;
-        if (data.status !== 'PENDING') throw new Error('Esta solicitud ya fue procesada.');
+        if (data.status !== 'PENDING' && data.status !== 'BLOCKED_PENDING') throw new Error('Esta solicitud ya fue procesada.');
 
         await updateDoc(ref, {
             status: 'APPROVED',
@@ -102,7 +102,7 @@ export const DiscountApprovalService = {
         const snap = await getDoc(ref);
         if (!snap.exists()) throw new Error('Solicitud no encontrada.');
         const data = snap.data() as PendingDiscountApproval;
-        if (data.status !== 'PENDING') throw new Error('Esta solicitud ya fue procesada.');
+        if (data.status !== 'PENDING' && data.status !== 'BLOCKED_PENDING') throw new Error('Esta solicitud ya fue procesada.');
 
         await updateDoc(ref, {
             status: 'REJECTED',
@@ -119,7 +119,58 @@ export const DiscountApprovalService = {
             data.branchId,
             `Rechazado descuento ${data.effectiveDiscountPct.toFixed(1)}% en ${data.productName}: ${rejectionReason.trim()}`
         );
-    }
+    },
+
+    requestHardBlock: async (input: {
+        saleId?: string;
+        productId: string;
+        productCode: string;
+        productName: string;
+        branchId: string;
+        cashierId: string;
+        cashierName: string;
+        originalPrice: number;
+        finalPrice: number;
+        discountMode: 'PERCENTAGE' | 'FIXED_PRICE';
+        discountValue: number;
+        effectiveDiscountPct: number;
+        thresholdPct: number;
+    }): Promise<string> => {
+        const ref = await addDoc(collection(db, COLLECTION), {
+            ...input,
+            requestedAt: serverTimestamp(),
+            status: 'BLOCKED_PENDING',
+            hardBlock: true
+        } satisfies Omit<PendingDiscountApproval, 'id'>);
+        await logAdminAction(
+            input.cashierId,
+            input.cashierName,
+            'REQUEST_DISCOUNT_APPROVAL',
+            ref.id,
+            input.branchId,
+            `[BLOQUEADO] Descuento ${input.effectiveDiscountPct.toFixed(1)}% en ${input.productName} (umbral bloqueo ${input.thresholdPct}%)`
+        );
+        return ref.id;
+    },
+
+    subscribeToHardBlockApproval: (
+        id: string,
+        callback: (status: 'APPROVED' | 'REJECTED', data: PendingDiscountApproval) => void
+    ): (() => void) => {
+        const ref = doc(db, COLLECTION, id);
+        return onSnapshot(ref, (snap) => {
+            if (!snap.exists()) return;
+            const raw = snap.data();
+            const resolved = raw.status === 'APPROVED' || raw.status === 'REJECTED';
+            if (!resolved) return;
+            callback(raw.status as 'APPROVED' | 'REJECTED', {
+                id: snap.id,
+                ...raw,
+                requestedAt: raw.requestedAt?.toDate?.() || raw.requestedAt,
+                resolvedAt: raw.resolvedAt?.toDate?.() || raw.resolvedAt,
+            } as PendingDiscountApproval);
+        });
+    },
 };
 
 // Re-export Timestamp para no romper imports si alguien lo usa

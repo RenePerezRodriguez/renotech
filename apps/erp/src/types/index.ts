@@ -699,6 +699,7 @@ export interface AppConfig {
     allowRetroactivePurchases?: boolean;    // Permite compras con fecha anterior a hoy (TODOS los roles)
     allowRetroactiveExpenses?: boolean;     // Permite gastos con fecha anterior a hoy (TODOS los roles)
     discountApprovalThresholdPercent?: number; // % de descuento que requiere revisión GERENTE (default 15)
+    discountHardBlockThresholdPercent?: number; // % que bloquea el POS hasta aprobación en tiempo real (default 30)
     updatedAt: Date | Timestamp | FieldValue;
 }
 
@@ -739,7 +740,8 @@ export interface PendingDiscountApproval {
     effectiveDiscountPct: number;
     thresholdPct: number;
     requestedAt: Date | Timestamp | FieldValue;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    status: 'PENDING' | 'BLOCKED_PENDING' | 'APPROVED' | 'REJECTED';
+    hardBlock?: boolean;
     resolvedBy?: string;
     resolvedByName?: string;
     resolvedAt?: Date | Timestamp | FieldValue;

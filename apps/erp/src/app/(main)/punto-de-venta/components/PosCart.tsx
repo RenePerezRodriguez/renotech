@@ -28,7 +28,6 @@ import { toast } from 'sonner';
 import { useProducts } from '@/hooks/useProducts';
 import { useBranch } from '@/contexts/BranchContext';
 import { useConfig } from '@/contexts/ConfigContext';
-import { AuditAlertService } from '@/services/AuditAlertService';
 import { midday, localDateStr } from '@/lib/utils';
 import { DiscountApprovalService } from '@/services/DiscountApprovalService';
 import { useOfflineQueue, enqueueOfflineSale } from '@/hooks/useOfflineQueue';
@@ -202,6 +201,47 @@ export default function PosCart() {
     }, [currentBranch?.id, user?.uid]);
 
 
+    // Hard-block discount modal state
+    const [hardBlockModal, setHardBlockModal] = useState<{
+        approvalId: string;
+        productId: string;
+        productName: string;
+        effectiveDiscountPct: number;
+        finalPrice: number;
+        basePrice: number;
+        discountMode: 'PERCENTAGE' | 'FIXED_PRICE';
+        discountValue: number;
+    } | null>(null);
+
+    useEffect(() => {
+        if (!hardBlockModal?.approvalId) return;
+        const unsub = DiscountApprovalService.subscribeToHardBlockApproval(
+            hardBlockModal.approvalId,
+            (status, data) => {
+                if (status === 'APPROVED') {
+                    applyDiscount(
+                        hardBlockModal.productId,
+                        data.discountMode,
+                        data.discountValue,
+                        user?.uid ?? '',
+                        user?.email ?? ''
+                    );
+                    toast.success('Descuento aprobado. Venta desbloqueada.', {
+                        description: `${data.productName} — Bs. ${data.originalPrice.toFixed(2)} → Bs. ${data.finalPrice.toFixed(2)}`,
+                        duration: 6000,
+                    });
+                } else {
+                    toast.error('Descuento rechazado por gerencia.', {
+                        description: data.rejectionReason ? `Motivo: ${data.rejectionReason}` : data.productName,
+                        duration: 8000,
+                    });
+                }
+                setHardBlockModal(null);
+            }
+        );
+        return () => unsub();
+    }, [hardBlockModal?.approvalId, applyDiscount, user?.uid, user?.email]);
+
     // Discount popover state
     const [discountTarget, setDiscountTarget] = useState<string | null>(null);
     const [discountMode, setDiscountMode] = useState<'PERCENTAGE' | 'FIXED_PRICE'>('PERCENTAGE');
@@ -235,16 +275,56 @@ export default function PosCart() {
             ? val
             : (basePrice > 0 ? ((basePrice - val) / basePrice) * 100 : 0);
 
-        const threshold = config?.discountApprovalThresholdPercent ?? 0;
-        const requiresApproval = threshold > 0 && effectiveDiscountPct > threshold;
-
         const finalPrice = discountMode === 'PERCENTAGE'
             ? Number((basePrice * (1 - val / 100)).toFixed(2))
             : val;
 
-        // Si supera el umbral → NO se aplica el descuento. Se envía a la bandeja
-        // de aprobación. El cajero puede seguir vendiendo el producto a precio
-        // normal hasta que el GERENTE apruebe.
+        const hardBlockThreshold = config?.discountHardBlockThresholdPercent ?? 0;
+        const threshold = config?.discountApprovalThresholdPercent ?? 0;
+        const requiresHardBlock = hardBlockThreshold > 0 && effectiveDiscountPct > hardBlockThreshold;
+        const requiresApproval = !requiresHardBlock && threshold > 0 && effectiveDiscountPct > threshold;
+
+        // Tier 3: supera umbral de bloqueo → POS bloqueado hasta aprobación en tiempo real
+        if (requiresHardBlock && currentBranch?.id) {
+            if (hardBlockModal) {
+                toast.info('Ya hay una solicitud de bloqueo activa. Espera la respuesta del gerente.');
+                return;
+            }
+            try {
+                const approvalId = await DiscountApprovalService.requestHardBlock({
+                    productId,
+                    productCode: item.product.codigo || '',
+                    productName: item.product.nombre || '',
+                    branchId: currentBranch.id,
+                    cashierId: user.uid,
+                    cashierName: userName ?? user.email ?? '',
+                    originalPrice: basePrice,
+                    finalPrice,
+                    discountMode,
+                    discountValue: val,
+                    effectiveDiscountPct,
+                    thresholdPct: hardBlockThreshold,
+                });
+                setHardBlockModal({
+                    approvalId,
+                    productId,
+                    productName: item.product.nombre || '',
+                    effectiveDiscountPct,
+                    finalPrice,
+                    basePrice,
+                    discountMode,
+                    discountValue: val,
+                });
+            } catch (err) {
+                console.error('No se pudo crear solicitud de bloqueo:', err);
+                toast.error('No se pudo enviar la solicitud. Intenta nuevamente.');
+            }
+            setDiscountTarget(null);
+            setDiscountValue('');
+            return;
+        }
+
+        // Tier 2: supera umbral de revisión → envío a bandeja, venta continúa a precio normal
         if (requiresApproval && currentBranch?.id) {
             // Bloquear si ya hay una solicitud pendiente para este producto
             if (item.pendingDiscount) {
@@ -280,8 +360,6 @@ export default function PosCart() {
                 return;
             }
 
-            // (No creamos AuditAlert aquí: la solicitud pendiente ya aparece en el
-            // panel de notificaciones del gerente como ítem accionable.)
             setDiscountTarget(null);
             setDiscountValue('');
             return;
@@ -289,23 +367,6 @@ export default function PosCart() {
 
         // Descuento dentro del umbral → aplicar al carrito
         applyDiscount(productId, discountMode, val, user.uid, user.email || '');
-
-        // Auditoría informativa de descuentos normales
-        if (currentBranch?.id) {
-            AuditAlertService.createAlert({
-                type: 'DISCOUNT_OVERRIDE',
-                severity: val > 20 || (discountMode === 'FIXED_PRICE' && finalPrice < basePrice * 0.7) ? 'HIGH' : 'MEDIUM',
-                branchId: currentBranch.id,
-                userId: user.uid,
-                userName: userName ?? undefined,
-                message: `Descuento aplicado: ${item.product.nombre} (${item.product.codigo}) — ${discountMode === 'PERCENTAGE' ? `${val}%` : `Bs. ${val} fijo`} — Bs. ${basePrice.toFixed(2)} → Bs. ${finalPrice.toFixed(2)}`,
-                metadata: {
-                    productId, productCode: item.product.codigo,
-                    discountType: discountMode, discountValue: val,
-                    originalPrice: basePrice, finalPrice, requiresApproval: false,
-                },
-            });
-        }
 
         if (!requiresApproval) {
             toast.info(`Descuento aplicado: ${discountMode === 'PERCENTAGE' ? `${val}%` : `Bs. ${val}`}`, {
@@ -315,7 +376,7 @@ export default function PosCart() {
 
         setDiscountTarget(null);
         setDiscountValue('');
-    }, [discountValue, discountMode, cart, user, userName, currentBranch, applyDiscount, setPendingDiscount, config]);
+    }, [discountValue, discountMode, cart, user, userName, currentBranch, applyDiscount, setPendingDiscount, config, hardBlockModal, setHardBlockModal]);
 
     const confirmCheckout = useCallback(async () => {
         if (isProcessing) return; // CRITICAL: Stop double execution
@@ -1924,6 +1985,42 @@ export default function PosCart() {
                 anchor={cartItemHover?.element ?? null}
                 product={cartItemHover?.product ?? null}
             />
+
+            {hardBlockModal && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl p-8 max-w-sm w-full mx-4 flex flex-col items-center gap-5 border border-slate-200 dark:border-white/10">
+                        <div className="flex flex-col items-center gap-2 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center mb-1">
+                                <AlertCircle size={32} className="text-rose-500" />
+                            </div>
+                            <h2 className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                                Descuento bloqueado
+                            </h2>
+                            <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                                Esperando aprobación del gerente
+                            </p>
+                        </div>
+                        <div className="w-full rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 space-y-1 text-center">
+                            <p className="text-xl font-black text-rose-500">{hardBlockModal.effectiveDiscountPct.toFixed(1)}% descuento</p>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{hardBlockModal.productName}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Bs. {hardBlockModal.basePrice.toFixed(2)} → Bs. {hardBlockModal.finalPrice.toFixed(2)}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                            El gerente recibió la solicitud. Esta ventana se cerrará automáticamente.
+                        </div>
+                        <button
+                            onClick={() => setHardBlockModal(null)}
+                            className="text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white uppercase tracking-widest transition-colors"
+                        >
+                            Cancelar solicitud
+                        </button>
+                    </div>
+                </div>,
+                document.body
+            )}
         </div>
     );
 }

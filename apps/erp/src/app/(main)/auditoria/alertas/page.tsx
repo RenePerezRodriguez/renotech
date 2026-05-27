@@ -270,19 +270,35 @@ export default function AuditAlertsPage() {
                                     </div>
                                 </div>
 
-                                {alert.metadata && (
-                                    <div className="mt-5 p-4 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/10 space-y-1.5">
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Impacto Técnico:</span>
-                                        {Object.entries(alert.metadata).map(([key, value]) => (
-                                            <div key={key} className="flex justify-between items-center text-[10px] font-bold">
-                                                <span className="text-slate-500 uppercase">{key}:</span>
-                                                <span className="text-slate-900 dark:text-white tabular-nums">
-                                                    {typeof value === 'number' ? `Bs. ${value.toFixed(2)}` : String(value)}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                {alert.metadata && (() => {
+                                    const LABELS: Record<string, string> = {
+                                        productCode:   'Código producto',
+                                        discountType:  'Tipo descuento',
+                                        discountValue: 'Descuento aplicado',
+                                        originalPrice: 'Precio original',
+                                        finalPrice:    'Precio final',
+                                        stock:         'Stock actual',
+                                        minStock:      'Stock mínimo',
+                                        amount:        'Monto',
+                                        category:      'Categoría',
+                                    };
+                                    const HIDDEN = new Set(['productId', 'requiresApproval', 'expenseId', 'discrepancyReason']);
+                                    const entries = Object.entries(alert.metadata).filter(([k]) => !HIDDEN.has(k));
+                                    if (entries.length === 0) return null;
+                                    return (
+                                        <div className="mt-5 p-4 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/10 space-y-1.5">
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Detalle del evento:</span>
+                                            {entries.map(([key, value]) => (
+                                                <div key={key} className="flex justify-between items-center text-[10px] font-bold">
+                                                    <span className="text-slate-500 uppercase">{LABELS[key] ?? key}:</span>
+                                                    <span className="text-slate-900 dark:text-white tabular-nums">
+                                                        {typeof value === 'number' ? `Bs. ${value.toFixed(2)}` : String(value)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         ))}
                     </div>
