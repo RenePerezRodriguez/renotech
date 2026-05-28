@@ -72,7 +72,7 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
     const previousBalance = selectedDrawer?.currentBalance ?? 0;
     const hasMismatch = !!selectedDrawer && !isFirstSession && Math.abs(total - previousBalance) >= 0.01;
     const needsInitialJustification = isFirstSession && total > 0;
-    const canSubmit = !!selectedDrawerId && !submitting && !hasMismatch
+    const canSubmit = !!selectedDrawerId && !submitting && total > 0 && !hasMismatch
         && (!needsInitialJustification || initialJustification.trim().length >= 10);
 
     const handleSubmit = async () => {

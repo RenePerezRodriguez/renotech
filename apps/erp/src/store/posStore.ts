@@ -296,49 +296,51 @@ export const usePosStore = create<PosState>()(
                     let cashMovementPayload = undefined;
                     let splitCashMovements: { cash: Omit<CashMovement, 'id'>; qr: Omit<CashMovement, 'id'> } | undefined = undefined;
 
-                    if (paymentMethod === 'MIXTO' && splitPayment) {
-                        // Two separate cash movements for split payment
-                        splitCashMovements = {
-                            cash: {
+                    const isRetroactive = !!operationDate && operationDate !== __todayStr;
+
+                    if (!isRetroactive) {
+                        if (paymentMethod === 'MIXTO' && splitPayment) {
+                            splitCashMovements = {
+                                cash: {
+                                    shiftId: '',
+                                    type: 'INGRESO' as const,
+                                    amount: splitPayment.cash,
+                                    reason: `Venta POS (Efectivo - Pago Mixto)`,
+                                    date: saleDateObj,
+                                    userId: userId,
+                                    paymentMethod: 'EFECTIVO'
+                                },
+                                qr: {
+                                    shiftId: '',
+                                    type: 'INGRESO' as const,
+                                    amount: splitPayment.qr,
+                                    reason: `Venta POS (QR - Pago Mixto)`,
+                                    date: saleDateObj,
+                                    userId: userId,
+                                    paymentMethod: 'QR'
+                                }
+                            };
+                        } else if (paymentMethod === 'CUOTAS' && adelanto && adelanto > 0) {
+                            cashMovementPayload = {
                                 shiftId: '',
                                 type: 'INGRESO' as const,
-                                amount: splitPayment.cash,
-                                reason: `Venta POS (Efectivo - Pago Mixto)`,
+                                amount: adelanto,
+                                reason: `Adelanto Venta a Cuotas (${adelantoMethod || 'EFECTIVO'})`,
                                 date: saleDateObj,
                                 userId: userId,
-                                paymentMethod: 'EFECTIVO'
-                            },
-                            qr: {
+                                paymentMethod: (adelantoMethod || 'EFECTIVO') as 'EFECTIVO' | 'QR'
+                            };
+                        } else if (paymentMethod !== 'CUOTAS') {
+                            cashMovementPayload = {
                                 shiftId: '',
                                 type: 'INGRESO' as const,
-                                amount: splitPayment.qr,
-                                reason: `Venta POS (QR - Pago Mixto)`,
+                                amount: totals.total,
+                                reason: 'Venta POS',
                                 date: saleDateObj,
                                 userId: userId,
-                                paymentMethod: 'QR'
-                            }
-                        };
-                    } else if (paymentMethod === 'CUOTAS' && adelanto && adelanto > 0) {
-                        // CUOTAS with down payment: register adelanto
-                        cashMovementPayload = {
-                            shiftId: '',
-                            type: 'INGRESO' as const,
-                            amount: adelanto,
-                            reason: `Adelanto Venta a Cuotas (${adelantoMethod || 'EFECTIVO'})`,
-                            date: saleDateObj,
-                            userId: userId,
-                            paymentMethod: (adelantoMethod || 'EFECTIVO') as 'EFECTIVO' | 'QR'
-                        };
-                    } else if (paymentMethod !== 'CUOTAS') {
-                        cashMovementPayload = {
-                            shiftId: '',
-                            type: 'INGRESO' as const,
-                            amount: totals.total,
-                            reason: `Venta POS${operationDate ? ' (Retroactiva)' : ''}`,
-                            date: saleDateObj,
-                            userId: userId,
-                            paymentMethod: paymentMethod as 'EFECTIVO' | 'QR'
-                        };
+                                paymentMethod: paymentMethod as 'EFECTIVO' | 'QR'
+                            };
+                        }
                     }
 
                     const id = await SaleService.createSale(saleData, branchId, adminInfo, cashMovementPayload, splitCashMovements, installments);

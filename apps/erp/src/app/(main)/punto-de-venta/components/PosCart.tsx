@@ -683,13 +683,15 @@ export default function PosCart() {
             return;
         }
 
-        if (!openShift) {
+        const isRetroactiveSale = !!operationDate && operationDate !== localDateStr() && config?.allowRetroactiveSales === true;
+
+        if (!openShift && !isRetroactiveSale) {
             toast.error('Caja cerrada', {
                 description: 'Abre tu sesión de caja en el módulo Caja → Mi Caja antes de procesar ventas en efectivo, QR o transferencia.',
             });
             return;
         }
-        if (paymentMethod === 'CUOTAS' && Number(adelanto) > 0 && !openShift) {
+        if (paymentMethod === 'CUOTAS' && Number(adelanto) > 0 && !openShift && !isRetroactiveSale) {
             toast.error('Debes abrir la caja de esta sucursal antes de registrar el adelanto.');
             return;
         }
