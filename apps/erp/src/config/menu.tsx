@@ -1,4 +1,4 @@
-import { 
+import {
     LucideIcon,
     LayoutDashboard,
     ShoppingCart,
@@ -17,9 +17,10 @@ import {
     Shield,
     BookOpen,
     Briefcase,
-    Layers,
+    CreditCard,
     Bus,
-    Send
+    Send,
+    Landmark,
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -38,58 +39,57 @@ export const menuGroups: MenuGroup[] = [
     {
         title: 'Principal',
         items: [
-            { name: 'Dashboard', icon: LayoutDashboard, href: '/inicio' },
-        ]
+            { name: 'Inicio',        icon: LayoutDashboard, href: '/inicio' },
+            { name: 'Estadísticas',  icon: BarChart3,       href: '/estadisticas', hqOnly: true },
+        ],
     },
     {
-        title: 'Ventas',
+        title: 'Operaciones',
         items: [
-            { name: 'POS', icon: ShoppingCart, href: '/punto-de-venta' },
-            { name: 'Cotizaciones', icon: ClipboardList, href: '/cotizaciones' },
-            { name: 'Ventas', icon: Receipt, href: '/ventas' },
-            { name: 'Clientes', icon: Users, href: '/clientes' },
-            { name: 'Créditos', icon: Layers, href: '/creditos' },
-        ]
+            { name: 'Punto de Venta', icon: ShoppingCart,   href: '/punto-de-venta' },
+            { name: 'Ventas',         icon: Receipt,         href: '/ventas' },
+            { name: 'Cotizaciones',   icon: ClipboardList,   href: '/cotizaciones' },
+            { name: 'Compras',        icon: Truck,           href: '/compras' },
+            { name: 'Pedidos',        icon: ArrowLeftRight,  href: '/pedidos' },
+            { name: 'Envíos',         icon: Send,            href: '/envios' },
+        ],
     },
     {
-        title: 'Tesorería',
+        title: 'Clientes',
         items: [
-            { name: 'Caja', icon: Banknote, href: '/caja' },
-            { name: 'Tesorería', icon: Wallet, href: '/tesoreria', hqOnly: true },
-        ]
+            { name: 'Clientes',  icon: Users,      href: '/clientes' },
+            { name: 'Créditos',  icon: CreditCard, href: '/creditos' },
+        ],
     },
     {
-        title: 'Inventario y Logística',
+        title: 'Inventario',
         items: [
-            { name: 'Inventario', icon: Package, href: '/inventario' },
-            { name: 'Pedidos', icon: ArrowLeftRight, href: '/pedidos' },
-            { name: 'Envíos', icon: Send, href: '/envios' },
-            { name: 'Transportes', icon: Bus, href: '/transportes' },
-        ]
+            { name: 'Inventario', icon: Package,  href: '/inventario' },
+            { name: 'Kardex',     icon: BookOpen, href: '/kardex' },
+        ],
     },
     {
-        title: 'Compras',
+        title: 'Finanzas',
         items: [
-            { name: 'Compras', icon: Truck, href: '/compras' },
-            { name: 'Proveedores', icon: Briefcase, href: '/proveedores' },
-        ]
+            { name: 'Caja',      icon: Banknote, href: '/caja' },
+            { name: 'Tesorería', icon: Wallet,   href: '/tesoreria', hqOnly: true },
+        ],
     },
     {
-        title: 'Control y Auditoría',
+        title: 'Proveedores',
         items: [
-            { name: 'Kardex', icon: BookOpen, href: '/kardex' },
-            { name: 'Auditoría', icon: Shield, href: '/auditoria', hqOnly: true },
-            { name: 'Estadísticas', icon: BarChart3, href: '/estadisticas', hqOnly: true },
-            { name: 'Gerencia', icon: Briefcase, href: '/gerencia', hqOnly: true },
-        ]
+            { name: 'Proveedores',  icon: Briefcase, href: '/proveedores' },
+            { name: 'Transportes',  icon: Bus,        href: '/transportes' },
+        ],
     },
     {
         title: 'Administración',
         items: [
-            { name: 'Sucursales', icon: Building2, href: '/sucursales', hqOnly: true },
-            { name: 'Usuarios', icon: UserCog, href: '/usuarios', hqOnly: true },
-            { name: 'Configuración', icon: Settings, href: '/configuracion' },
-        ]
+            { name: 'Gerencia',       icon: Landmark,  href: '/gerencia',       hqOnly: true },
+            { name: 'Auditoría',      icon: Shield,    href: '/auditoria',      hqOnly: true },
+            { name: 'Sucursales',     icon: Building2, href: '/sucursales',     hqOnly: true },
+            { name: 'Usuarios',       icon: UserCog,   href: '/usuarios',       hqOnly: true },
+            { name: 'Configuración',  icon: Settings,  href: '/configuracion' },
+        ],
     },
 ];
-
