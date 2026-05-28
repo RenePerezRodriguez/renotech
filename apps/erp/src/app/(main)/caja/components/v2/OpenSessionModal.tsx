@@ -7,7 +7,7 @@
  */
 'use client';
 import React, { useEffect, useState, useMemo } from 'react';
-import { Lock, Wallet } from 'lucide-react';
+import { Lock, Wallet, Info } from 'lucide-react';
 import IndustrialModal from '@/components/common/IndustrialModal';
 import DenominationsInput from './DenominationsInput';
 import { AccountService } from '@/services/AccountService';
@@ -33,6 +33,7 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
     const [selectedDrawerId, setSelectedDrawerId] = useState<string>('');
     const [denoms, setDenoms] = useState<CashDenominations>({});
     const [notes, setNotes] = useState('');
+    const [initialJustification, setInitialJustification] = useState('');
 
     useEffect(() => {
         if (!isOpen) return;
@@ -52,6 +53,7 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
             setSelectedDrawerId('');
             setDenoms({});
             setNotes('');
+            setInitialJustification('');
         }
     }, [isOpen]);
 
@@ -63,7 +65,9 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
     // significa que cerraron el turno con caja vacía, lo cual es válido y debe verificarse.
     const isFirstSession = selectedDrawer !== null && (selectedDrawer as Account & { openingBalance?: number }).openingBalance === undefined;
     const hasMismatch = !!selectedDrawer && !isFirstSession && Math.abs(total - previousBalance) >= 0.01;
-    const canSubmit = !!selectedDrawerId && !submitting && !hasMismatch;
+    const needsInitialJustification = isFirstSession && total > 0;
+    const canSubmit = !!selectedDrawerId && !submitting && !hasMismatch
+        && (!needsInitialJustification || initialJustification.trim().length >= 10);
 
     const handleSubmit = async () => {
         if (!selectedDrawerId) return toast.error('Selecciona un cajón');
@@ -78,7 +82,9 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
                 cashierName,
                 cashierRole,
                 openingDenominations: denoms,
-                openingNotes: notes.trim(),
+                openingNotes: needsInitialJustification
+                    ? `[FONDO INICIAL] ${initialJustification.trim()}`
+                    : notes.trim() || undefined,
             });
             window.dispatchEvent(new Event('cash-shift-changed'));
             toast.success(`Sesión abierta · efectivo inicial Bs. ${total.toFixed(2)}`);
@@ -171,30 +177,56 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
                     </div>
                 )}
 
-                {/* Primera sesión: aviso informativo */}
+                {/* Primera sesión */}
                 {isFirstSession && selectedDrawer && (
-                    <div className="rounded-xl border border-blue-500/40 bg-blue-500/5 px-4 py-3 text-xs font-bold text-blue-700 dark:text-blue-400 space-y-1">
-                        <div className="text-[10px] font-black uppercase tracking-[0.2em]">Primera sesión</div>
-                        <div className="text-[10px] font-bold tracking-wider opacity-90">
-                            Este cajón no tiene saldo previo. El efectivo declarado (Bs. {total.toFixed(2)}) se registrará como saldo inicial.
+                    <div className="rounded-xl border border-blue-500/40 bg-blue-500/5 px-4 py-3 space-y-3">
+                        <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                            <Info size={13} strokeWidth={2.5} className="shrink-0" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Primera apertura de este cajón</span>
                         </div>
+                        <p className="text-[10px] font-bold text-blue-700/80 dark:text-blue-400/80 leading-relaxed">
+                            No existe saldo previo. Si arrancás con un fondo de cambio ingresá las denominaciones arriba y justificá el origen del capital. Si abrís en cero dejá el conteo vacío.
+                        </p>
+
+                        {/* Justificación obligatoria cuando hay capital inicial */}
+                        {needsInitialJustification && (
+                            <div className="space-y-1.5 pt-1">
+                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                                    Justificación del fondo inicial
+                                    <span className="text-rose-500">*</span>
+                                </label>
+                                <textarea
+                                    value={initialJustification}
+                                    onChange={(e) => setInitialJustification(e.target.value)}
+                                    rows={2}
+                                    maxLength={300}
+                                    placeholder="Ej: Fondo de cambio autorizado por gerencia para apertura de sucursal…"
+                                    className="w-full rounded-xl border border-blue-300 dark:border-blue-500/40 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-bold outline-none focus:border-yellow-500 transition resize-none"
+                                />
+                                {initialJustification.trim().length > 0 && initialJustification.trim().length < 10 && (
+                                    <p className="text-[9px] font-bold text-rose-500">Mínimo 10 caracteres ({initialJustification.trim().length}/10)</p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Notas */}
-                <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                        Notas (opcional)
-                    </label>
-                    <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        rows={2}
-                        maxLength={300}
-                        placeholder="Observaciones del inicio de turno…"
-                        className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-bold outline-none focus:border-yellow-500 transition resize-none"
-                    />
-                </div>
+                {/* Notas (sesiones normales o primera sesión sin capital) */}
+                {(!isFirstSession || !needsInitialJustification) && (
+                    <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
+                            Notas (opcional)
+                        </label>
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            rows={2}
+                            maxLength={300}
+                            placeholder="Observaciones del inicio de turno…"
+                            className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 px-4 py-2.5 text-sm font-bold outline-none focus:border-yellow-500 transition resize-none"
+                        />
+                    </div>
+                )}
             </div>
         </IndustrialModal>
     );
