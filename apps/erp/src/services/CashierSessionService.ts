@@ -322,6 +322,17 @@ export const CashierSessionService = {
         }
     },
 
+    /** Devuelve true si este cajón nunca tuvo ninguna sesión (primera vez real). */
+    async isFirstEverSession(cashDrawerId: string): Promise<boolean> {
+        const q = query(
+            collection(db, COLLECTION),
+            where('cashDrawerId', '==', cashDrawerId),
+            fbLimit(1)
+        );
+        const snap = await getDocs(q);
+        return snap.empty;
+    },
+
     async getById(sessionId: string): Promise<CashierSession | null> {
         const snap = await getDoc(doc(db, COLLECTION, sessionId));
         if (!snap.exists()) return null;

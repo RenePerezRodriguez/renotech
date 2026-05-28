@@ -34,6 +34,7 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
     const [denoms, setDenoms] = useState<CashDenominations>({});
     const [notes, setNotes] = useState('');
     const [initialJustification, setInitialJustification] = useState('');
+    const [isFirstSession, setIsFirstSession] = useState(false);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -54,16 +55,21 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
             setDenoms({});
             setNotes('');
             setInitialJustification('');
+            setIsFirstSession(false);
         }
     }, [isOpen]);
+
+    // Determinar si es primera sesión real consultando Firestore
+    useEffect(() => {
+        if (!selectedDrawerId) { setIsFirstSession(false); return; }
+        CashierSessionService.isFirstEverSession(selectedDrawerId)
+            .then(setIsFirstSession)
+            .catch(() => setIsFirstSession(false));
+    }, [selectedDrawerId]);
 
     const total = useMemo(() => calculateDenominationsTotal(denoms), [denoms]);
     const selectedDrawer = useMemo(() => drawers.find(d => d.id === selectedDrawerId) || null, [drawers, selectedDrawerId]);
     const previousBalance = selectedDrawer?.currentBalance ?? 0;
-    // BUG-05: una cuenta con openingBalance === undefined nunca tuvo una sesión (primera vez real).
-    // Una cuenta con openingBalance seteado (aunque sea 0) ya pasó por apertura — el saldo 0
-    // significa que cerraron el turno con caja vacía, lo cual es válido y debe verificarse.
-    const isFirstSession = selectedDrawer !== null && (selectedDrawer as Account & { openingBalance?: number }).openingBalance === undefined;
     const hasMismatch = !!selectedDrawer && !isFirstSession && Math.abs(total - previousBalance) >= 0.01;
     const needsInitialJustification = isFirstSession && total > 0;
     const canSubmit = !!selectedDrawerId && !submitting && !hasMismatch
