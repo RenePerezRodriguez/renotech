@@ -4,6 +4,7 @@ import { Purchase, InventoryMovement } from '@/types';
 import { SupplierService } from '@/services/SupplierService';
 import { logAdminAction } from '@/lib/audit';
 import { JournalService } from './JournalService';
+import { KardexService } from './KardexService';
 import { throwStandardError } from '@/utils/errorCodes';
 
 const PURCHASE_COLLECTION = 'compras';
@@ -93,6 +94,10 @@ export const PurchaseService = {
         }
 
         const newPurchaseRef = doc(collection(db, PURCHASE_COLLECTION));
+
+        // Pares (masterId, branchId) afectados. Se llenan dentro de la tx y se
+        // usan después para recalcular kardex si la compra es retroactiva.
+        const affectedKardexPairs: Array<{ masterId: string; branchId: string }> = [];
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -236,26 +241,28 @@ export const PurchaseService = {
                     }
 
                     // Log Movement (with MasterId)
-                    const purchaseDate = (purchase.date instanceof Timestamp) 
-                        ? purchase.date 
+                    const purchaseDate = (purchase.date instanceof Timestamp)
+                        ? purchase.date
                         : ((purchase.date instanceof Date) ? Timestamp.fromDate(purchase.date) : serverTimestamp());
                     const movRef = doc(collection(db, 'movimientos'));
+                    const movMasterId = productData?.masterId || item.productId;
                     transaction.set(movRef, {
                         productId: targetDocRef.id,
-                        masterId: productData?.masterId || item.productId, // Mandatory
-                        branchId: branchId, 
+                        masterId: movMasterId, // Mandatory
+                        branchId: branchId,
                         type: 'ENTRADA',
                         quantity: finalQuantity,
                         currentStock: newStock,
                         previousStock: currentStock,
                         reason: `Compra a ${purchase.supplierName} #${newPurchaseRef.id.slice(-6).toUpperCase()}${item.unit ? ` (${item.quantity} ${item.unit})` : ''}`,
                         referenceId: newPurchaseRef.id,
-                        date: purchaseDate, 
+                        date: purchaseDate,
                         userId: adminInfo?.uid,
                         userEmail: adminInfo?.email,
                         userName: adminInfo?.name,
                         createdAt: serverTimestamp()
                     } as InventoryMovement);
+                    if (movMasterId) affectedKardexPairs.push({ masterId: movMasterId, branchId });
                 }
 
                 // 3. Create Purchase Header (No items array)
@@ -321,6 +328,20 @@ export const PurchaseService = {
                     });
                 }
             });
+
+            // Recalcular kardex si la compra es retroactiva (fecha < hoy).
+            try {
+                const purchaseDateObj = purchase.date instanceof Date
+                    ? purchase.date
+                    : (purchase.date instanceof Timestamp ? purchase.date.toDate() : new Date());
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (purchaseDateObj < today && affectedKardexPairs.length > 0) {
+                    await KardexService.recalculateMany(affectedKardexPairs, purchaseDateObj);
+                }
+            } catch (recalcErr) {
+                console.error('[PurchaseService] recalcKardex falló:', recalcErr);
+            }
 
             if (adminInfo) {
                 await logAdminAction(adminInfo.uid, adminInfo.email, 'CREATE_PURCHASE', newPurchaseRef.id, branchId, `Compra registrada - Total: Bs. ${purchase.total}`);

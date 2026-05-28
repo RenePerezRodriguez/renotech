@@ -3,6 +3,7 @@ import { collection, query, where, getDocs, addDoc, orderBy, Timestamp, serverTi
 import { Sale, InventoryMovement, SaleItem, CashMovement, Installment } from '@/types';
 import { logAdminAction } from '@/lib/audit';
 import { JournalService } from './JournalService';
+import { KardexService } from './KardexService';
 import { throwStandardError } from '@/utils/errorCodes';
 
 const COLLECTION_NAME = 'ventas';
@@ -45,6 +46,11 @@ export const SaleService = {
                 });
             }
             
+            // Pares (masterId, branchId) afectados por esta venta. Se llenan dentro
+            // de la transacción y se usan después para recalcular el kardex si la
+            // venta es retroactiva.
+            const affectedKardexPairs: Array<{ masterId: string; branchId: string }> = [];
+
             await runTransaction(db, async (transaction) => {
                 // ============================================================
                 // PHASE 1: ALL READS (Firestore requires reads before writes)
@@ -247,6 +253,9 @@ export const SaleService = {
                         userName: sale.usuarioNombre || sale.usuarioEmail || 'SISTEMA',
                         createdAt: serverTimestamp()
                     } as InventoryMovement);
+                    if (productData.masterId) {
+                        affectedKardexPairs.push({ masterId: productData.masterId, branchId });
+                    }
 
                     // KIT EXPANSION: Discount components using cached data
                     if (productData.type === 'KIT' && productData.kitItems && Array.isArray(productData.kitItems)) {
@@ -279,6 +288,7 @@ export const SaleService = {
                                     userName: sale.usuarioNombre || sale.usuarioEmail || 'SISTEMA',
                                     createdAt: serverTimestamp()
                                 } as InventoryMovement);
+                                affectedKardexPairs.push({ masterId: kitItem.masterId, branchId });
                             }
                         }
                     }
@@ -495,6 +505,20 @@ export const SaleService = {
                     }
                 }
             });
+
+            // Recalcular kardex si la venta es retroactiva (fecha < hoy).
+            // Esto corrige el currentStock de los movimientos posteriores que
+            // quedaron desactualizados al insertar uno en el pasado.
+            try {
+                const saleDateObj = sale.fecha instanceof Date ? sale.fecha : new Date();
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (saleDateObj < today && affectedKardexPairs.length > 0) {
+                    await KardexService.recalculateMany(affectedKardexPairs, saleDateObj);
+                }
+            } catch (recalcErr) {
+                console.error('[SaleService] recalcKardex falló:', recalcErr);
+            }
 
             if (adminInfo) {
                 await logAdminAction(adminInfo.uid, adminInfo.email, 'CREATE_SALE', newSaleRef.id, branchId, `Venta generada (Total: Bs. ${sale.total.toFixed(2)})`);

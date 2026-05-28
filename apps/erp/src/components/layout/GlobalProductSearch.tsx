@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, limit, getDocs, QueryConstraint } from 'firebase/firestore';
 import { InventoryMovement } from '@/types';
+import { ENTRY_TYPES, EXIT_TYPES } from '@/lib/inventory/movementTypes';
 import { useProductStore } from '@/store/productStore';
 import { useBranch } from '@/contexts/BranchContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,11 +40,6 @@ const TYPE_LABELS: Record<string, string> = {
     CARGA_INICIAL:  'Carga Inicial',
     REPOSICION:     'Reposicion',
 };
-
-const ENTRY_TYPES = new Set([
-    'ENTRADA', 'TRASP_ENTRADA', 'TRASP_REVERSAL', 'GARANTIA_ENTRADA', 'ANULACION', 'CARGA_INICIAL', 'REPOSICION',
-]);
-const EXIT_TYPES = new Set(['SALIDA', 'TRASP_SALIDA', 'GARANTIA_SALIDA']);
 
 function classifyMov(m: InventoryMovement): 'entrada' | 'salida' | 'ajuste' {
     if (ENTRY_TYPES.has(m.type)) return 'entrada';
