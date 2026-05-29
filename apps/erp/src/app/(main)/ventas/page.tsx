@@ -303,7 +303,7 @@ export default function SalesHistoryPage() {
     };
 
     const promptReturnItem = (sale: Sale, itemIndex: number) => {
-        const item = sale.items?.[itemIndex];
+        const item = selectedSaleItems[itemIndex];
         if (!item) return;
         const availableQty = item.quantity - (item.returnedQuantity || 0);
         if (availableQty <= 0) {
