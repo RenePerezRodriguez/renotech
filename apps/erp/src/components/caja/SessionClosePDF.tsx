@@ -316,7 +316,7 @@ const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
                     <View style={styles.infoGrid}>
                         {/* Cajero / Sucursal */}
                         <View style={styles.cajeroCol}>
-                            <Text style={styles.labelHeader}>Responsable del Turno</Text>
+                            <Text style={styles.labelHeader}>Abierto Por</Text>
                             <Text style={styles.cajeroName}>{formatUserName(session.cashierName)}</Text>
                             {config?.branchName && (
                                 <Text style={styles.cajeroDetail}>Sucursal: {config.branchName}</Text>
