@@ -352,6 +352,17 @@ export const PrintService = {
             let config = await ConfigService.getConfig(branchId || session.branchId);
             if (!config) config = await ConfigService.getConfig() || {} as AppConfig;
 
+            // 1.5 Obtener nombre del usuario GERENTE para la firma de verificación
+            let gerenteName: string | undefined;
+            try {
+                const { getDocs: _getDocs, query: _query, collection: _col, where: _where } = await import('firebase/firestore');
+                const { db: _db } = await import('@/lib/firebase');
+                const gerenteSnap = await _getDocs(_query(_col(_db, 'users'), _where('role', '==', 'GERENTE')));
+                if (!gerenteSnap.empty) {
+                    gerenteName = gerenteSnap.docs[0].data().displayName as string | undefined;
+                }
+            } catch { /* best-effort */ }
+
             // 2. Dynamic import + render PDF
             const { pdf } = await import('@react-pdf/renderer');
             const SessionClosePDF = (await import('@/components/caja/SessionClosePDF')).default;
@@ -360,6 +371,7 @@ export const PrintService = {
                 <SessionClosePDF
                     session={session}
                     config={config || undefined}
+                    gerenteName={gerenteName}
                 />
             ).toBlob();
 

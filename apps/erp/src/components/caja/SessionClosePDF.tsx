@@ -241,9 +241,10 @@ const styles = StyleSheet.create({
 interface Props {
     session: CashierSession;
     config?: AppConfig;
+    gerenteName?: string;
 }
 
-const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
+const SessionClosePDF: React.FC<Props> = ({ session, config, gerenteName }) => {
     const openedAt = session.openedAt ? ensureDate(session.openedAt) : null;
     const closedAt = session.closedAt ? ensureDate(session.closedAt) : null;
 
@@ -319,17 +320,20 @@ const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
                         <View style={styles.cajeroCol}>
                             <Text style={styles.labelHeader}>Abierto Por</Text>
                             <Text style={styles.cajeroName}>{formatUserName(session.cashierName)}</Text>
+                            {session.cashierRole && (
+                                <Text style={styles.cajeroDetail}>{formatRoleName(session.cashierRole)}</Text>
+                            )}
                             {config?.branchName && (
                                 <Text style={styles.cajeroDetail}>Sucursal: {config.branchName}</Text>
                             )}
                             <Text style={styles.cajeroDetail}>Cajón Físico ID: #{session.cashDrawerId.slice(0, 12).toUpperCase()}</Text>
-                            
+
                             <Text style={[styles.labelHeader, { marginTop: 8 }]}>Cerrado Por</Text>
                             <Text style={styles.cajeroName}>
                                 {session.closedByName ? formatUserName(session.closedByName) : formatUserName(session.cashierName)}
                             </Text>
-                            {session.closedByName && session.closedByRole && (
-                                <Text style={styles.cajeroDetail}>Rol: {session.closedByRole}</Text>
+                            {(session.closedByRole || session.cashierRole) && (
+                                <Text style={styles.cajeroDetail}>{formatRoleName(session.closedByRole || session.cashierRole)}</Text>
                             )}
                         </View>
 
@@ -523,13 +527,9 @@ const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
                         <View style={styles.sigBox}>
                             <Text style={styles.sigLabel}>Verificación / Gerencia</Text>
                             <Text style={styles.sigName}>
-                                {(session.closedByRole === 'GERENTE' && session.closedByName)
-                                    ? formatUserName(session.closedByName).toUpperCase()
-                                    : session.forceClosedByName
-                                        ? formatUserName(session.forceClosedByName).toUpperCase()
-                                        : session.blockedAcknowledgedByName
-                                            ? formatUserName(session.blockedAcknowledgedByName).toUpperCase()
-                                            : '___________________________'}
+                                {gerenteName
+                                    ? formatUserName(gerenteName).toUpperCase()
+                                    : '___________________________'}
                             </Text>
                         </View>
                     </View>
