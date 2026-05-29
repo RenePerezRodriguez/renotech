@@ -483,7 +483,7 @@ const ReceiptDocument: React.FC<ReceiptProps> = ({ sale, qrCodeUrl, config, type
                                     bankAccounts.map((acc, idx) => (
                                         <View key={acc.id || idx} style={{ marginBottom: idx < bankAccounts.length - 1 ? 6 : 0 }}>
                                             <Text style={styles.bankDetail}>
-                                                {acc.name}{acc.accountTypeLabel ? ` - ${acc.accountTypeLabel}` : ''}
+                                                {acc.bankName || acc.name}{acc.accountTypeLabel ? ` - ${acc.accountTypeLabel}` : ''}
                                             </Text>
                                             <Text style={[styles.bankDetail, { fontWeight: 'bold', fontSize: 10 }]}>
                                                 {acc.accountNumber || ''}{acc.accountHolder ? ` - ${acc.accountHolder}` : ''}
