@@ -8,6 +8,7 @@ import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/render
 import { CashierSession, AppConfig } from '@/types';
 import { ensureDate } from '@/utils/dateHelpers';
 import { formatUserName } from '@/utils/formatUserName';
+import { formatRoleName } from '@/utils/formatRoleName';
 
 const STATUS_LABELS: Record<string, string> = {
     OPEN: 'ABIERTA',
@@ -516,7 +517,7 @@ const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
                     {/* ── Signatures ── */}
                     <View style={styles.signatures}>
                         <View style={styles.sigBox}>
-                            <Text style={styles.sigLabel}>Cajero Responsable</Text>
+                            <Text style={styles.sigLabel}>{formatRoleName(session.cashierRole) || 'Cajero'}</Text>
                             <Text style={styles.sigName}>{formatUserName(session.cashierName).toUpperCase()}</Text>
                         </View>
                         <View style={styles.sigBox}>
