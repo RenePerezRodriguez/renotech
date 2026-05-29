@@ -2,9 +2,10 @@
 import React from 'react';
 import QRCode from 'qrcode';
 import { ConfigService } from '@/services/ConfigService';
+import { AccountService } from '@/services/AccountService';
 import { AppConfig } from '@/types';
 import { Sale, Quotation, Product, Installment, InstallmentPaymentHistory, Envio, EnvioItem, Pedido, PedidoItem, Purchase, PurchaseItem } from '@/types';
-import { CashierSession } from '@/types/treasury';
+import { Account, CashierSession } from '@/types/treasury';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -30,6 +31,21 @@ export const PrintService = {
             // 2. Generate QR Code for external validation
             const validationUrl = `${window.location.origin}/verificar/${documentData.id}`;
             const qrCodeUrl = await QRCode.toDataURL(validationUrl, { width: 120, margin: 1 });
+
+            // 2.5 Load bank accounts for this branch (BANK type, active, available to branch).
+            // Si el documento es de una sucursal, mostramos sus cuentas. Si es global, todas activas.
+            let bankAccounts: Account[] = [];
+            try {
+                const docBranchId = (documentData as { branchId?: string }).branchId || branchId;
+                const all = await AccountService.list({
+                    type: 'BANK',
+                    branchId: docBranchId,
+                    includeInactive: false,
+                });
+                bankAccounts = all;
+            } catch (accErr) {
+                console.warn('[PrintService] No se pudieron cargar cuentas bancarias:', accErr);
+            }
 
             // 3. Dynamic Imports for React-PDF (heavy lib, keep it out of main bundle)
             const { pdf } = await import('@react-pdf/renderer');
@@ -75,6 +91,7 @@ export const PrintService = {
                     config={config || undefined}
                     type={type}
                     validationUrl={validationUrl}
+                    bankAccounts={bankAccounts}
                 />
             ).toBlob();
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { Sale, Quotation } from '@/types';
+import { Account } from '@/types/treasury';
 import { numberToSpanishWords } from '@/utils/numberToSpanishWords';
 import { ensureDate } from '@/utils/dateHelpers';
 import { formatUserName } from '@/utils/formatUserName';
@@ -328,9 +329,10 @@ interface ReceiptProps {
     };
     type?: 'SALE' | 'QUOTATION';
     validationUrl?: string;
+    bankAccounts?: Account[];
 }
 
-const ReceiptDocument: React.FC<ReceiptProps> = ({ sale, qrCodeUrl, config, type = 'SALE', validationUrl }) => {
+const ReceiptDocument: React.FC<ReceiptProps> = ({ sale, qrCodeUrl, config, type = 'SALE', validationUrl, bankAccounts }) => {
     if (!sale) return null;
 
     const JSDate = sale.fecha instanceof Date ? sale.fecha : new Date();
@@ -477,12 +479,23 @@ const ReceiptDocument: React.FC<ReceiptProps> = ({ sale, qrCodeUrl, config, type
                         <View style={styles.bankBox}>
                             <Text style={styles.bankTitle}>INFORMACIÓN BANCARIA</Text>
                             <View style={{ marginTop: 5 }}>
-                                {config?.bankName && (
+                                {bankAccounts && bankAccounts.length > 0 ? (
+                                    bankAccounts.map((acc, idx) => (
+                                        <View key={acc.id || idx} style={{ marginBottom: idx < bankAccounts.length - 1 ? 6 : 0 }}>
+                                            <Text style={styles.bankDetail}>
+                                                {acc.name}{acc.accountTypeLabel ? ` - ${acc.accountTypeLabel}` : ''}
+                                            </Text>
+                                            <Text style={[styles.bankDetail, { fontWeight: 'bold', fontSize: 10 }]}>
+                                                {acc.accountNumber || ''}{acc.accountHolder ? ` - ${acc.accountHolder}` : ''}
+                                            </Text>
+                                        </View>
+                                    ))
+                                ) : config?.bankName ? (
                                     <>
-                                        <Text style={styles.bankDetail}>{config.bankName} {config?.accountType ? `- ${config.accountType}` : ''}</Text>
-                                        <Text style={[styles.bankDetail, { fontWeight: 'bold', fontSize: 10 }]}>{config?.accountNumber || ''} {config?.accountHolder ? `- ${config.accountHolder}` : ''}</Text>
+                                        <Text style={styles.bankDetail}>{config.bankName}{config?.accountType ? ` - ${config.accountType}` : ''}</Text>
+                                        <Text style={[styles.bankDetail, { fontWeight: 'bold', fontSize: 10 }]}>{config?.accountNumber || ''}{config?.accountHolder ? ` - ${config.accountHolder}` : ''}</Text>
                                     </>
-                                )}
+                                ) : null}
                                 <Text style={styles.bankNote}>* Gracias por su preferencia. Conserve este documento.</Text>
                             </View>
                         </View>
