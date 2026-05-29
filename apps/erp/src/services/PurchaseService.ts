@@ -70,7 +70,22 @@ export const PurchaseService = {
         }
 
         const paymentMethod = purchase.paymentMethod || 'EFECTIVO';
-        const needsJournalEntry = (paymentMethod === 'EFECTIVO' || paymentMethod === 'QR' || paymentMethod === 'TRANSFERENCIA') && purchase.total > 0;
+
+        // Detectar retroactividad: si la fecha es anterior a hoy, la sesión de caja
+        // del día ya cerró. Para EFECTIVO retroactivo no se puede asentar (igual que
+        // ventas retroactivas EFECTIVO). Para QR/TRANSFERENCIA retroactivo sí se asienta
+        // — el dinero entró al banco real en esa fecha.
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const purchaseDateObj = purchase.date instanceof Date
+            ? purchase.date
+            : (purchase.date instanceof Timestamp ? purchase.date.toDate() : new Date());
+        const isRetroactive = purchaseDateObj < todayStart;
+        const isRetroactiveCash = isRetroactive && paymentMethod === 'EFECTIVO';
+
+        const needsJournalEntry = (paymentMethod === 'EFECTIVO' || paymentMethod === 'QR' || paymentMethod === 'TRANSFERENCIA')
+            && purchase.total > 0
+            && !isRetroactiveCash;
 
         // PRE-RESOLVER cuenta de tesorería (fuera de la tx). Si EFECTIVO requiere sesión OPEN.
         let resolvedAccount: { accountId: string; sessionId: string | null } | null = null;
