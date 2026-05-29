@@ -794,8 +794,6 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
 
     const [allowExpenses, setAllowExpenses] = useState(false);
 
-    const [discountThreshold, setDiscountThreshold] = useState('15');
-
     const [discountHardBlock, setDiscountHardBlock] = useState('30');
 
     const [saving, setSaving] = useState(false);
@@ -811,8 +809,6 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
         setAllowPurchases(config.allowRetroactivePurchases === true);
 
         setAllowExpenses(config.allowRetroactiveExpenses === true);
-
-        setDiscountThreshold(String(config.discountApprovalThresholdPercent ?? 15));
 
         setDiscountHardBlock(String(config.discountHardBlockThresholdPercent ?? 30));
 
@@ -843,8 +839,6 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
                 allowRetroactivePurchases: allowPurchases,
 
                 allowRetroactiveExpenses: allowExpenses,
-
-                discountApprovalThresholdPercent: Math.max(0, Math.min(100, parseFloat(discountThreshold) || 0)),
 
                 discountHardBlockThresholdPercent: Math.max(0, Math.min(100, parseFloat(discountHardBlock) || 0)),
 
@@ -954,21 +948,7 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
 
                     <NumberField
 
-                        label="% Descuento que requiere aprobación"
-
-                        suffix="%"
-
-                        value={discountThreshold}
-
-                        onChange={setDiscountThreshold}
-
-                        hint="Descuentos por encima de este % se envían a la bandeja de revisión post-venta."
-
-                    />
-
-                    <NumberField
-
-                        label="% Descuento que bloquea el POS"
+                        label="% Descuento máximo permitido"
 
                         suffix="%"
 
@@ -976,7 +956,7 @@ function PoliciesTab({ config, onSaved }: { config: AppConfig | null; onSaved: (
 
                         onChange={setDiscountHardBlock}
 
-                        hint="Descuentos por encima de este % bloquean el POS hasta que el GERENTE apruebe en tiempo real."
+                        hint="Por debajo de este % el descuento se aplica y queda en auditoría. Por encima, el POS se bloquea hasta que el GERENTE apruebe en tiempo real."
 
                     />
 

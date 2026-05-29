@@ -30,6 +30,7 @@ import { useBranch } from '@/contexts/BranchContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { midday, localDateStr } from '@/lib/utils';
 import { DiscountApprovalService } from '@/services/DiscountApprovalService';
+import { AuditAlertService } from '@/services/AuditAlertService';
 import { useOfflineQueue, enqueueOfflineSale } from '@/hooks/useOfflineQueue';
 import NumericInput from '@/components/common/NumericInput';
 import { formatTime } from '@/utils/dateHelpers';
@@ -280,11 +281,9 @@ export default function PosCart() {
             : val;
 
         const hardBlockThreshold = config?.discountHardBlockThresholdPercent ?? 0;
-        const threshold = config?.discountApprovalThresholdPercent ?? 0;
         const requiresHardBlock = hardBlockThreshold > 0 && effectiveDiscountPct > hardBlockThreshold;
-        const requiresApproval = !requiresHardBlock && threshold > 0 && effectiveDiscountPct > threshold;
 
-        // Tier 3: supera umbral de bloqueo → POS bloqueado hasta aprobación en tiempo real
+        // Tier 2: supera umbral → POS bloqueado hasta aprobación en tiempo real + auditoría HIGH
         if (requiresHardBlock && currentBranch?.id) {
             if (hardBlockModal) {
                 toast.info('Ya hay una solicitud de bloqueo activa. Espera la respuesta del gerente.');
@@ -315,6 +314,16 @@ export default function PosCart() {
                     discountMode,
                     discountValue: val,
                 });
+                // Auditoría: descuento bloqueado supera el umbral
+                AuditAlertService.createAlert({
+                    type: 'DISCOUNT_OVERRIDE',
+                    severity: 'HIGH',
+                    branchId: currentBranch.id,
+                    userId: user.uid,
+                    userName: userName ?? user.email ?? '',
+                    message: `Descuento BLOQUEADO ${effectiveDiscountPct.toFixed(1)}% en ${item.product.nombre} (Bs. ${basePrice.toFixed(2)} → Bs. ${finalPrice.toFixed(2)}). Supera umbral ${hardBlockThreshold}%. Esperando aprobación del gerente.`,
+                    metadata: { productId, approvalId, effectiveDiscountPct, thresholdPct: hardBlockThreshold, basePrice, finalPrice },
+                }).catch(err => console.error('AuditAlert HIGH falló:', err));
             } catch (err) {
                 console.error('No se pudo crear solicitud de bloqueo:', err);
                 toast.error('No se pudo enviar la solicitud. Intenta nuevamente.');
@@ -324,59 +333,28 @@ export default function PosCart() {
             return;
         }
 
-        // Tier 2: supera umbral de revisión → envío a bandeja, venta continúa a precio normal
-        if (requiresApproval && currentBranch?.id) {
-            // Bloquear si ya hay una solicitud pendiente para este producto
-            if (item.pendingDiscount) {
-                toast.info('Ya hay una solicitud pendiente para este producto.', {
-                    description: 'Espera la respuesta del gerente o cancélala desde el carrito.'
-                });
-                return;
-            }
-            try {
-                const approvalId = await DiscountApprovalService.create({
-                    productId,
-                    productCode: item.product.codigo || '',
-                    productName: item.product.nombre || '',
-                    branchId: currentBranch.id,
-                    cashierId: user.uid,
-                    cashierName: userName ?? user.email ?? '',
-                    originalPrice: basePrice,
-                    finalPrice,
-                    discountMode,
-                    discountValue: val,
-                    effectiveDiscountPct,
-                    thresholdPct: threshold,
-                });
-                setPendingDiscount(productId, { approvalId, type: discountMode, value: val });
-                toast.warning(`Descuento del ${effectiveDiscountPct.toFixed(1)}% enviado al gerente.`, {
-                    description: 'Te avisaremos cuando responda. El producto se mantiene a precio normal.'
-                });
-            } catch (err) {
-                console.error('No se pudo crear PendingDiscountApproval:', err);
-                toast.error('No se pudo enviar la solicitud. Intenta nuevamente.');
-                setDiscountTarget(null);
-                setDiscountValue('');
-                return;
-            }
-
-            setDiscountTarget(null);
-            setDiscountValue('');
-            return;
-        }
-
-        // Descuento dentro del umbral → aplicar al carrito
+        // Tier 1: dentro del umbral → aplica al carrito + auditoría LOW (notificación campanita)
         applyDiscount(productId, discountMode, val, user.uid, user.email || '');
 
-        if (!requiresApproval) {
-            toast.info(`Descuento aplicado: ${discountMode === 'PERCENTAGE' ? `${val}%` : `Bs. ${val}`}`, {
-                description: `${item.product.nombre} — Bs. ${basePrice.toFixed(2)} → Bs. ${finalPrice.toFixed(2)}`
-            });
+        toast.info(`Descuento aplicado: ${discountMode === 'PERCENTAGE' ? `${val}%` : `Bs. ${val}`}`, {
+            description: `${item.product.nombre} — Bs. ${basePrice.toFixed(2)} → Bs. ${finalPrice.toFixed(2)}`
+        });
+
+        if (currentBranch?.id) {
+            AuditAlertService.createAlert({
+                type: 'DISCOUNT_OVERRIDE',
+                severity: 'LOW',
+                branchId: currentBranch.id,
+                userId: user.uid,
+                userName: userName ?? user.email ?? '',
+                message: `Descuento aplicado ${effectiveDiscountPct.toFixed(1)}% en ${item.product.nombre} (Bs. ${basePrice.toFixed(2)} → Bs. ${finalPrice.toFixed(2)}). Dentro del umbral configurado.`,
+                metadata: { productId, effectiveDiscountPct, thresholdPct: hardBlockThreshold, basePrice, finalPrice },
+            }).catch(err => console.error('AuditAlert LOW falló:', err));
         }
 
         setDiscountTarget(null);
         setDiscountValue('');
-    }, [discountValue, discountMode, cart, user, userName, currentBranch, applyDiscount, setPendingDiscount, config, hardBlockModal, setHardBlockModal]);
+    }, [discountValue, discountMode, cart, user, userName, currentBranch, applyDiscount, config, hardBlockModal, setHardBlockModal]);
 
     const confirmCheckout = useCallback(async () => {
         if (isProcessing) return; // CRITICAL: Stop double execution

@@ -393,17 +393,19 @@ export const InventoryService = {
 
             transaction.update(productRef, { stock: newStock, updatedAt: serverTimestamp() });
 
-            // Audit Alert for Significant Discrepancy (>10%)
+            // Audit Alert escalada por discrepancia de ajuste:
+            //   >50% → HIGH, >30% → MEDIUM, >10% → LOW
             if (currentStock > 0) {
                 const discrepancyPct = (quantity / currentStock) * 100;
                 if (discrepancyPct > 10) {
+                    const severity = discrepancyPct > 50 ? 'HIGH' : discrepancyPct > 30 ? 'MEDIUM' : 'LOW';
                     const alertRef = doc(collection(db, 'alertas_auditoria'));
                     transaction.set(alertRef, {
                         type: 'INVENTORY_THRESHOLD',
-                        severity: 'HIGH',
+                        severity,
                         branchId,
                         userId,
-                        message: `AJUSTE CRÍTICO: Discrepancia del ${discrepancyPct.toFixed(1)}% detectada en "${pData.nombre || productId}". Stock Previo: ${currentStock}, Ajuste: ${quantity}`,
+                        message: `AJUSTE de stock con discrepancia ${discrepancyPct.toFixed(1)}% en "${pData.nombre || productId}". Stock Previo: ${currentStock}, Ajuste: ${quantity}`,
                         metadata: {
                             productId,
                             previousStock: currentStock,
