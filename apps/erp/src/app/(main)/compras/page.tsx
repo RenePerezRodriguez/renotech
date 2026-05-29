@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import clsx from 'clsx';
 import { downloadCSV } from '@/utils/csvExport';
 import { ensureDate, formatDate, formatDateTime } from '@/utils/dateHelpers';
+import { formatUserName } from '@/utils/formatUserName';
 import { startOfDay, endOfDay } from '@/lib/utils';
 
 // Suite Pro v4.0 Components
@@ -266,7 +267,7 @@ export default function PurchasesPage() {
             String(p.itemCount ?? '-'),
             p.total.toFixed(2),
             p.status === 'RECEIVED' ? 'RECIBIDA' : (p.status === 'PENDING' ? 'PENDIENTE' : p.status),
-            `"${p.usuarioNombre || 'SISTEMA'}"`
+            `"${formatUserName(p.usuarioNombre) || 'SISTEMA'}"`
         ]);
 
         downloadCSV('compras', headers, rows);
@@ -592,7 +593,7 @@ export default function PurchasesPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                                                {purchase.usuarioNombre || 'SISTEMA'}
+                                                {formatUserName(purchase.usuarioNombre) || 'SISTEMA'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right pr-6">
@@ -662,7 +663,7 @@ export default function PurchasesPage() {
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Responsable</span>
-                                        <span className="font-bold text-slate-600 dark:text-slate-300">{selectedPurchase.usuarioNombre || 'SISTEMA'}</span>
+                                        <span className="font-bold text-slate-600 dark:text-slate-300">{formatUserName(selectedPurchase.usuarioNombre) || 'SISTEMA'}</span>
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Sucursal registro</span>

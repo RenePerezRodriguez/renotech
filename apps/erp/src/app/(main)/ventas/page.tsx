@@ -22,6 +22,7 @@ import { downloadCSV } from '@/utils/csvExport';
 import { startOfDay, endOfDay, localDateStr } from '@/lib/utils';
 import { normalizeText } from '@/utils/normalize';
 import { ensureDate, formatDate as formatBoDate, formatDateTime, formatTime } from '@/utils/dateHelpers';
+import { formatUserName } from '@/utils/formatUserName';
 import { isStaff as isStaffRole, isEncargadoVentas } from '@/utils/roles';
 import { getFailedSales, clearFailedSales, QueuedSale } from '@/hooks/useOfflineQueue';
 
@@ -752,7 +753,7 @@ export default function SalesHistoryPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col">
                                             <span className="text-[9px] font-black uppercase text-slate-900 dark:text-slate-300 tracking-widest">
-                                                {sale.usuarioNombre || 'SYSTEM_CORE'}
+                                                {formatUserName(sale.usuarioNombre) || 'SYSTEM_CORE'}
                                             </span>
                                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
                                                 USR-{sale.usuarioId?.slice(-6) || 'SVC'}

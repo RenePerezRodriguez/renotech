@@ -14,6 +14,7 @@ import { AccountService } from '@/services/AccountService';
 import { CashierSessionService } from '@/services/CashierSessionService';
 import type { Account, CashDenominations } from '@/types/treasury';
 import { calculateDenominationsTotal } from '@/types/treasury';
+import { formatUserName } from '@/utils/formatUserName';
 import { toast } from 'sonner';
 
 interface Props {
@@ -115,7 +116,7 @@ export default function OpenSessionModal({ isOpen, onClose, onOpened, cashierId,
             footer={
                 <div className="flex items-center justify-between gap-3">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Cajero: <span className="font-black text-slate-900 dark:text-white">{cashierName}</span>
+                        Cajero: <span className="font-black text-slate-900 dark:text-white">{formatUserName(cashierName)}</span>
                     </div>
                     <div className="flex gap-2">
                         <button onClick={onClose} disabled={submitting}

@@ -330,7 +330,7 @@ function CajaTable({ isLoading, pagedCaja, formatDate, safeBranches }: any) {
                     pagedCaja.map((s: any) => (
                         <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                             <td className="px-6 py-4"><div className="text-xs font-bold text-slate-900 dark:text-white">{formatDate(s.openedAt)}</div></td>
-                            <td className="px-6 py-4 text-xs font-bold text-slate-800 dark:text-slate-200">{s.cashierName || s.cashierId}</td>
+                            <td className="px-6 py-4 text-xs font-bold text-slate-800 dark:text-slate-200">{formatUserName(s.cashierName) || s.cashierId}</td>
                             <td className="px-6 py-4"><span className="text-[10px] font-bold uppercase text-slate-500">{safeBranches.find((b: any) => b.id === s.branchId)?.name || s.branchId}</span></td>
                             <td className="px-6 py-4 font-black tabular-nums text-slate-900 dark:text-white">Bs. {(s.initialAmount || 0).toFixed(2)}</td>
                             <td className="px-6 py-4"><span className={clsx('inline-flex items-center px-2 py-1 rounded-xl text-[9px] font-black uppercase', s.closedAt ? 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400')}>{s.closedAt ? 'Cerrada' : 'Abierta'}</span></td>

@@ -680,7 +680,7 @@ function ApprovalsTab({
 
                                     <span className="flex items-center gap-1"><Clock size={11} /> {exp.date instanceof Date ? exp.date.toLocaleDateString('es-BO') : ensureDate(exp.date).toLocaleDateString('es-BO')}</span>
 
-                                    <span className="flex items-center gap-1">Cajero: {exp.userName}</span>
+                                    <span className="flex items-center gap-1">Cajero: {formatUserName(exp.userName)}</span>
 
                                     {exp.paymentMethod && <span>Pago: {exp.paymentMethod}</span>}
 
@@ -754,9 +754,9 @@ function ApprovalsTab({
 
                                     </span>
 
-                                    {exp.approvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {exp.approvedByName}</span>}
+                                    {exp.approvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {formatUserName(exp.approvedByName)}</span>}
 
-                                    {exp.rejectedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {exp.rejectedByName}</span>}
+                                    {exp.rejectedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {formatUserName(exp.rejectedByName)}</span>}
 
                                     {exp.rejectionReason && <span className="text-[9px] text-rose-500 font-bold text-right">{exp.rejectionReason}</span>}
 
@@ -1574,7 +1574,7 @@ function VoidApprovalsTab({
 
                                     <span className="flex items-center gap-1"><Clock size={11} /> Venta: {ensureDate(req.saleDate as Date).toLocaleDateString('es-BO')}</span>
 
-                                    <span>Solicitó: {req.requestedByName}</span>
+                                    <span>Solicitó: {formatUserName(req.requestedByName)}</span>
 
                                 </div>
 
@@ -1624,7 +1624,7 @@ function VoidApprovalsTab({
 
                                     </span>
 
-                                    {req.approvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {req.approvedByName}</span>}
+                                    {req.approvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {formatUserName(req.approvedByName)}</span>}
 
                                     {req.approvedAt instanceof Date && <span className="text-[9px] text-slate-400 font-bold">{req.approvedAt.toLocaleDateString('es-BO')}</span>}
 
@@ -2426,7 +2426,7 @@ function DiscountApprovalsTab({
 
                                         </span>
 
-                                        {req.resolvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {req.resolvedByName}</span>}
+                                        {req.resolvedByName && <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">por {formatUserName(req.resolvedByName)}</span>}
 
                                         {req.resolvedAt instanceof Date && <span className="text-[9px] text-slate-400 font-bold">{req.resolvedAt.toLocaleDateString('es-BO')}</span>}
 

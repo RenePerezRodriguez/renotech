@@ -28,6 +28,7 @@ import ModuleHeader from '@/components/common/ModuleHeader';
 import KpiCard from '@/components/common/KpiCard';
 import FilterBar from '@/components/common/FilterBar';
 import { formatDate, formatDateTime } from '@/utils/dateHelpers';
+import { formatRoleName } from '@/utils/formatRoleName';
 
 export default function UsersPage() {
     const { user: currentUser, loading: authLoading } = useAuth();
@@ -426,7 +427,7 @@ export default function UsersPage() {
                                         <span className="block text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Rango Operativo</span>
                                         <div className="flex items-center gap-2">
                                             <Shield size={10} className="text-yellow-500" />
-                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase">{user.role}</span>
+                                            <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase">{formatRoleName(user.role)}</span>
                                         </div>
                                     </div>
                                     <div className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/10">
@@ -537,7 +538,7 @@ export default function UsersPage() {
                                         {user.uid === currentUser?.uid ? (
                                             <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl">
                                                 <Shield size={12} className="text-purple-500" />
-                                                <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{user.role}</span>
+                                                <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{formatRoleName(user.role)}</span>
                                             </div>
                                         ) : (
                                             <select
