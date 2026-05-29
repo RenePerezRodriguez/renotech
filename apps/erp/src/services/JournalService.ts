@@ -474,6 +474,20 @@ export const JournalService = {
     },
 
     /**
+     * Variante de txReadAccount que PERMITE leer cuentas inactivas.
+     * Uso exclusivo para asientos de REVERSO/ANULACIÓN: la cuenta puede haber
+     * sido deshabilitada después de la operación original, pero el reverso
+     * contable debe ir a la misma cuenta donde se asentó el original.
+     */
+    async txReadAccountForReversal(tx: Transaction, accountId: string): Promise<{ ref: ReturnType<typeof doc>; account: Account } | null> {
+        const ref = doc(db, 'accounts', accountId);
+        const snap = await tx.get(ref);
+        if (!snap.exists()) return null; // cuenta eliminada → caller decide fallback
+        const account = { id: snap.id, ...snap.data() } as Account;
+        return { ref, account };
+    },
+
+    /**
      * Lee una sesión de cajero dentro de TX y exige status='OPEN'.
      * Usar antes de txWriteEntry cuando la cuenta es CASH_DRAWER, para impedir
      * asentar contra una sesión recién cerrada (race entre apertura y cierre).

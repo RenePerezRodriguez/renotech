@@ -548,38 +548,36 @@ export const SaleService = {
 
             if (saleData.status === 'VOIDED') throwStandardError('POS_VOID_ALREADY_PROCESSED');
 
-            // Pre-resolver cuentas para reverso (segun metodo de pago original)
+            // Pre-resolver cuentas para reverso usando el accountId del journal_entry
+            // ORIGINAL (no la default actual). Esto garantiza que el reverso caiga en
+            // la misma cuenta donde se asentó la venta — aunque la cuenta haya sido
+            // deshabilitada después y exista una cuenta nueva como default.
             type Resolved = { accountId: string; sessionId: string | null };
             let resolvedCash: Resolved | null = null;
             let resolvedDigital: Resolved | null = null;
             let resolvedSingle: Resolved | null = null;
             const userName = adminInfo?.email || saleData.usuarioNombre || 'SISTEMA';
 
-            // Detectar si la venta tuvo asiento original en journal_entries.
-            // Las ventas EFECTIVO retroactivas no asentaron (sesión de caja cerrada),
-            // por lo que no deben generar reverso bancario. Si tampoco hay asientos
-            // en QR/TRANS, asumimos legacy/retroactiva y saltamos el reverso.
             const originalEntries = await JournalService.list({
                 referenceType: 'SALE',
                 referenceId: saleId,
-                limit: 5,
+                limit: 10,
             });
-            const hadOriginalEntries = originalEntries.length > 0;
-            const hadCashEntry = originalEntries.some(e => e.paymentMethod === 'EFECTIVO');
-            const hadDigitalEntry = originalEntries.some(e => e.paymentMethod === 'QR' || e.paymentMethod === 'TRANSFERENCIA');
+            // Solo considerar entries originales (no reversos previos)
+            const originals = originalEntries.filter(e => e.category === 'VENTA' || e.category === 'COBRO_CUOTA');
+            const cashOrig = originals.find(e => e.paymentMethod === 'EFECTIVO');
+            const digitalOrig = originals.find(e => e.paymentMethod === 'QR' || e.paymentMethod === 'TRANSFERENCIA');
 
-            if (hadOriginalEntries) {
-                if (saleData.metodoPago === 'MIXTO') {
-                    if (hadCashEntry)    resolvedCash = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
-                    if (hadDigitalEntry) resolvedDigital = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
-                } else if (saleData.metodoPago === 'EFECTIVO' && hadCashEntry) {
-                    resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
-                } else if (saleData.metodoPago === 'QR' && hadDigitalEntry) {
-                    resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
-                } else if (saleData.metodoPago === 'CUOTAS' && Number(saleData.adelanto || 0) > 0 && (hadCashEntry || hadDigitalEntry)) {
-                    const adelantoMethod: 'EFECTIVO' | 'QR' | 'TRANSFERENCIA' = hadCashEntry ? 'EFECTIVO' : 'QR';
-                    resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: adelantoMethod, cashierId: userId });
-                }
+            if (saleData.metodoPago === 'MIXTO') {
+                if (cashOrig)    resolvedCash    = { accountId: cashOrig.accountId,    sessionId: cashOrig.sessionId    || null };
+                if (digitalOrig) resolvedDigital = { accountId: digitalOrig.accountId, sessionId: digitalOrig.sessionId || null };
+            } else if (saleData.metodoPago === 'EFECTIVO' && cashOrig) {
+                resolvedSingle = { accountId: cashOrig.accountId, sessionId: cashOrig.sessionId || null };
+            } else if (saleData.metodoPago === 'QR' && digitalOrig) {
+                resolvedSingle = { accountId: digitalOrig.accountId, sessionId: digitalOrig.sessionId || null };
+            } else if (saleData.metodoPago === 'CUOTAS' && Number(saleData.adelanto || 0) > 0) {
+                const orig = cashOrig || digitalOrig;
+                if (orig) resolvedSingle = { accountId: orig.accountId, sessionId: orig.sessionId || null };
             }
 
             const saleItems = await SaleService.getSaleItems(saleId);
@@ -591,12 +589,14 @@ export const SaleService = {
 
             await runTransaction(db, async (transaction) => {
                 // ============= FASE 1: TODAS LAS LECTURAS =============
-                // Cuentas
-                const accCash = resolvedCash ? await JournalService.txReadAccount(transaction, resolvedCash.accountId) : null;
-                const accDigital = resolvedDigital ? await JournalService.txReadAccount(transaction, resolvedDigital.accountId) : null;
-                const accSingle = resolvedSingle ? await JournalService.txReadAccount(transaction, resolvedSingle.accountId) : null;
-                if (resolvedCash?.sessionId) await JournalService.txEnsureSessionOpen(transaction, resolvedCash.sessionId);
-                if (resolvedSingle?.sessionId) await JournalService.txEnsureSessionOpen(transaction, resolvedSingle.sessionId);
+                // Cuentas — usamos la variante ForReversal: si la cuenta original fue
+                // deshabilitada después de la venta, el reverso igualmente debe asentarse
+                // ahí para no desbalancear el extracto histórico.
+                const accCash = resolvedCash ? await JournalService.txReadAccountForReversal(transaction, resolvedCash.accountId) : null;
+                const accDigital = resolvedDigital ? await JournalService.txReadAccountForReversal(transaction, resolvedDigital.accountId) : null;
+                const accSingle = resolvedSingle ? await JournalService.txReadAccountForReversal(transaction, resolvedSingle.accountId) : null;
+                // NOTA: NO validamos session.status='OPEN' en reversos. La sesión original
+                // puede haber cerrado hace meses; aun así el reverso se debe asentar.
 
                 // Pre-leer TODOS los productos antes de cualquier escritura
                 type ProductRead = { item: typeof saleItems[number]; ref: ReturnType<typeof doc>; data: Record<string, unknown> | null };
@@ -777,25 +777,26 @@ export const SaleService = {
                 throwStandardError('POS_VOID_ALREADY_PROCESSED', 'Venta ya anulada por completo');
             }
 
-            // Pre-resolver cuenta para reverso parcial (segun metodo). MIXTO no soportado a nivel item.
+            // Pre-resolver cuenta para reverso parcial usando el accountId del asiento ORIGINAL
+            // (no la default actual). Garantiza coherencia contable aunque haya cambiado la
+            // cuenta default.
             type Resolved = { accountId: string; sessionId: string | null };
             let resolvedSingle: Resolved | null = null;
             const userName = adminInfo?.email || saleData.usuarioNombre || 'SISTEMA';
 
-            // Detectar si la venta original tuvo asiento en journal_entries.
-            // Si no tuvo (ej. EFECTIVO retroactiva), no generar reverso bancario.
             const originalEntries = await JournalService.list({
                 referenceType: 'SALE',
                 referenceId: saleId,
-                limit: 5,
+                limit: 10,
             });
-            const hadCashEntry = originalEntries.some(e => e.paymentMethod === 'EFECTIVO');
-            const hadDigitalEntry = originalEntries.some(e => e.paymentMethod === 'QR' || e.paymentMethod === 'TRANSFERENCIA');
+            const originals = originalEntries.filter(e => e.category === 'VENTA' || e.category === 'COBRO_CUOTA');
+            const cashOrig = originals.find(e => e.paymentMethod === 'EFECTIVO');
+            const digitalOrig = originals.find(e => e.paymentMethod === 'QR' || e.paymentMethod === 'TRANSFERENCIA');
 
-            if (saleData.metodoPago === 'EFECTIVO' && hadCashEntry) {
-                resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
-            } else if (saleData.metodoPago === 'QR' && hadDigitalEntry) {
-                resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
+            if (saleData.metodoPago === 'EFECTIVO' && cashOrig) {
+                resolvedSingle = { accountId: cashOrig.accountId, sessionId: cashOrig.sessionId || null };
+            } else if (saleData.metodoPago === 'QR' && digitalOrig) {
+                resolvedSingle = { accountId: digitalOrig.accountId, sessionId: digitalOrig.sessionId || null };
             }
 
             // Pre-leer item FUERA de TX para saber productId y poder pre-cargar getDocs de cuotas
@@ -833,8 +834,10 @@ export const SaleService = {
                     }
                 }
 
-                const accSingle = resolvedSingle ? await JournalService.txReadAccount(transaction, resolvedSingle.accountId) : null;
-                if (resolvedSingle?.sessionId) await JournalService.txEnsureSessionOpen(transaction, resolvedSingle.sessionId);
+                // Reverso: usar variante que acepta cuentas deshabilitadas (la original
+                // pudo haber sido deshabilitada después de la venta).
+                const accSingle = resolvedSingle ? await JournalService.txReadAccountForReversal(transaction, resolvedSingle.accountId) : null;
+                // NOTA: no validamos session.status='OPEN' en reversos.
 
                 // ============= FASE 2: TODAS LAS ESCRITURAS =============
                 

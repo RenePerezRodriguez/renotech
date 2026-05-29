@@ -392,15 +392,35 @@ export const PurchaseService = {
             const totalValue = Number((qtyToReturn * item.cost).toFixed(2));
             const newReturnedQty = returnedQty + qtyToReturn;
             const isFullyReturned = newReturnedQty >= item.quantity;
-            
+
             const accRef = purchaseData.supplierId ? doc(db, SUPPLIER_ACCOUNT_COLLECTION, purchaseData.supplierId) : null;
             let empresaId = '';
+
+            // Pre-resolver reverso bancario usando el asiento ORIGINAL de la compra.
+            // Si la compra fue pagada con EFECTIVO/QR/TRANSFERENCIA, hay un journal_entry
+            // que debe revertirse proporcionalmente. CREDITO no tiene entry (se descuenta
+            // del saldo del proveedor que ya se maneja abajo).
+            type Resolved = { accountId: string; sessionId: string | null; paymentMethod: 'EFECTIVO' | 'QR' | 'TRANSFERENCIA' };
+            let bankReversal: Resolved | null = null;
+            const purchaseEntries = await JournalService.list({
+                referenceType: 'PURCHASE',
+                referenceId: purchaseId,
+                limit: 5,
+            });
+            const purchaseOrig = purchaseEntries.find(e => e.category === 'COMPRA_STOCK');
+            if (purchaseOrig) {
+                bankReversal = {
+                    accountId: purchaseOrig.accountId,
+                    sessionId: purchaseOrig.sessionId || null,
+                    paymentMethod: purchaseOrig.paymentMethod as 'EFECTIVO' | 'QR' | 'TRANSFERENCIA',
+                };
+            }
             
             await runTransaction(db, async (tx) => {
                 let accSnap = null;
                 let empresaRef = null;
                 let empresaSnap = null;
-                
+
                 if (accRef) {
                     accSnap = await tx.get(accRef);
                     if (accSnap.exists()) {
@@ -412,6 +432,11 @@ export const PurchaseService = {
                         }
                     }
                 }
+
+                // Pre-leer la cuenta para el reverso bancario (si aplica)
+                const bankAccRead = bankReversal
+                    ? await JournalService.txReadAccountForReversal(tx, bankReversal.accountId)
+                    : null;
 
                 const productRef = doc(db, PRODUCT_COLLECTION, item.productId);
                 const productSnap = await tx.get(productRef);
@@ -457,6 +482,25 @@ export const PurchaseService = {
                     if (empresaRef && empresaSnap?.exists()) {
                         tx.update(empresaRef, { saldoTotal: increment(-totalValue), updatedAt: serverTimestamp() });
                     }
+                }
+
+                // Reverso bancario: si la compra fue pagada (EFECTIVO/QR/TRANSFERENCIA),
+                // crear un DEBIT en la cuenta original por el valor proporcional devuelto.
+                // El proveedor regresa el dinero al mismo banco/cajón donde se le pagó.
+                if (bankReversal && bankAccRead) {
+                    JournalService.txWriteEntry(tx, bankAccRead, {
+                        accountId: bankReversal.accountId,
+                        amount: totalValue,
+                        paymentMethod: bankReversal.paymentMethod,
+                        category: 'DEVOLUCION_COMPRA',
+                        description: `Devolución Compra #${purchaseId.slice(-6).toUpperCase()} — ${purchaseData.supplierName} (${reason})`,
+                        referenceType: 'PURCHASE',
+                        referenceId: purchaseId,
+                        sessionId: bankReversal.sessionId,
+                        branchId: purchaseData.branchId,
+                        userId: adminInfo.uid,
+                        userName: adminInfo.name || adminInfo.email,
+                    });
                 }
 
                 const devCol = collection(db, 'devoluciones_proveedor');
