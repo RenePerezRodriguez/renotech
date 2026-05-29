@@ -352,12 +352,16 @@ export const PrintService = {
             let config = await ConfigService.getConfig(branchId || session.branchId);
             if (!config) config = await ConfigService.getConfig() || {} as AppConfig;
 
-            // 1.5 Obtener nombre del usuario GERENTE para la firma de verificación
+            // 1.5 Obtener nombre del GERENTE HQ para la firma de verificación.
+            // Se filtra role=GERENTE + isHQ=true para identificar al gerente único
+            // de la casa matriz aunque haya varios gerentes de sucursal.
             let gerenteName: string | undefined;
             try {
                 const { getDocs: _getDocs, query: _query, collection: _col, where: _where } = await import('firebase/firestore');
                 const { db: _db } = await import('@/lib/firebase');
-                const gerenteSnap = await _getDocs(_query(_col(_db, 'users'), _where('role', '==', 'GERENTE')));
+                const gerenteSnap = await _getDocs(
+                    _query(_col(_db, 'users'), _where('role', '==', 'GERENTE'), _where('isHQ', '==', true))
+                );
                 if (!gerenteSnap.empty) {
                     gerenteName = gerenteSnap.docs[0].data().displayName as string | undefined;
                 }
