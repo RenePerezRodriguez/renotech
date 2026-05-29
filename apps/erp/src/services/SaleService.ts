@@ -554,15 +554,32 @@ export const SaleService = {
             let resolvedDigital: Resolved | null = null;
             let resolvedSingle: Resolved | null = null;
             const userName = adminInfo?.email || saleData.usuarioNombre || 'SISTEMA';
-            if (saleData.metodoPago === 'MIXTO') {
-                resolvedCash = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
-                resolvedDigital = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
-            } else if (saleData.metodoPago === 'EFECTIVO') {
-                resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
-            } else if (saleData.metodoPago === 'QR') {
-                resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
-            } else if (saleData.metodoPago === 'CUOTAS' && Number(saleData.adelanto || 0) > 0) {
-                resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
+
+            // Detectar si la venta tuvo asiento original en journal_entries.
+            // Las ventas EFECTIVO retroactivas no asentaron (sesión de caja cerrada),
+            // por lo que no deben generar reverso bancario. Si tampoco hay asientos
+            // en QR/TRANS, asumimos legacy/retroactiva y saltamos el reverso.
+            const originalEntries = await JournalService.list({
+                referenceType: 'SALE',
+                referenceId: saleId,
+                limit: 5,
+            });
+            const hadOriginalEntries = originalEntries.length > 0;
+            const hadCashEntry = originalEntries.some(e => e.paymentMethod === 'EFECTIVO');
+            const hadDigitalEntry = originalEntries.some(e => e.paymentMethod === 'QR' || e.paymentMethod === 'TRANSFERENCIA');
+
+            if (hadOriginalEntries) {
+                if (saleData.metodoPago === 'MIXTO') {
+                    if (hadCashEntry)    resolvedCash = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
+                    if (hadDigitalEntry) resolvedDigital = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
+                } else if (saleData.metodoPago === 'EFECTIVO' && hadCashEntry) {
+                    resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
+                } else if (saleData.metodoPago === 'QR' && hadDigitalEntry) {
+                    resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
+                } else if (saleData.metodoPago === 'CUOTAS' && Number(saleData.adelanto || 0) > 0 && (hadCashEntry || hadDigitalEntry)) {
+                    const adelantoMethod: 'EFECTIVO' | 'QR' | 'TRANSFERENCIA' = hadCashEntry ? 'EFECTIVO' : 'QR';
+                    resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: adelantoMethod, cashierId: userId });
+                }
             }
 
             const saleItems = await SaleService.getSaleItems(saleId);
@@ -764,9 +781,20 @@ export const SaleService = {
             type Resolved = { accountId: string; sessionId: string | null };
             let resolvedSingle: Resolved | null = null;
             const userName = adminInfo?.email || saleData.usuarioNombre || 'SISTEMA';
-            if (saleData.metodoPago === 'EFECTIVO') {
+
+            // Detectar si la venta original tuvo asiento en journal_entries.
+            // Si no tuvo (ej. EFECTIVO retroactiva), no generar reverso bancario.
+            const originalEntries = await JournalService.list({
+                referenceType: 'SALE',
+                referenceId: saleId,
+                limit: 5,
+            });
+            const hadCashEntry = originalEntries.some(e => e.paymentMethod === 'EFECTIVO');
+            const hadDigitalEntry = originalEntries.some(e => e.paymentMethod === 'QR' || e.paymentMethod === 'TRANSFERENCIA');
+
+            if (saleData.metodoPago === 'EFECTIVO' && hadCashEntry) {
                 resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'EFECTIVO', cashierId: userId });
-            } else if (saleData.metodoPago === 'QR') {
+            } else if (saleData.metodoPago === 'QR' && hadDigitalEntry) {
                 resolvedSingle = await JournalService.resolveAccountId({ branchId: saleData.branchId, paymentMethod: 'QR' });
             }
 

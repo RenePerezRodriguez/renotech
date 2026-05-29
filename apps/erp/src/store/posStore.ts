@@ -297,9 +297,29 @@ export const usePosStore = create<PosState>()(
                     let splitCashMovements: { cash: Omit<CashMovement, 'id'>; qr: Omit<CashMovement, 'id'> } | undefined = undefined;
 
                     const isRetroactive = !!operationDate && operationDate !== __todayStr;
+                    // EFECTIVO retroactivo no se asienta: la sesión de caja del día pasado
+                    // ya fue cerrada y arqueada, no se puede reabrir.
+                    // QR / TRANSFERENCIA retroactivo SÍ se asienta porque va a la cuenta
+                    // bancaria/billetera real — el dinero realmente entró en esa fecha y
+                    // debe reflejarse para que cuadre la conciliación bancaria.
+                    const retroNote = isRetroactive ? ' (Retroactiva)' : '';
 
-                    if (!isRetroactive) {
-                        if (paymentMethod === 'MIXTO' && splitPayment) {
+                    if (paymentMethod === 'MIXTO' && splitPayment) {
+                        if (isRetroactive) {
+                            // MIXTO retroactivo: la parte efectivo se ignora (caja del día cerrada),
+                            // la parte QR sí asienta como payload simple.
+                            if (splitPayment.qr > 0) {
+                                cashMovementPayload = {
+                                    shiftId: '',
+                                    type: 'INGRESO' as const,
+                                    amount: splitPayment.qr,
+                                    reason: `Venta POS (QR - Pago Mixto)${retroNote}`,
+                                    date: saleDateObj,
+                                    userId: userId,
+                                    paymentMethod: 'QR' as const
+                                };
+                            }
+                        } else {
                             splitCashMovements = {
                                 cash: {
                                     shiftId: '',
@@ -320,25 +340,33 @@ export const usePosStore = create<PosState>()(
                                     paymentMethod: 'QR'
                                 }
                             };
-                        } else if (paymentMethod === 'CUOTAS' && adelanto && adelanto > 0) {
+                        }
+                    } else if (paymentMethod === 'CUOTAS' && adelanto && adelanto > 0) {
+                        const method = (adelantoMethod || 'EFECTIVO') as 'EFECTIVO' | 'QR';
+                        // Adelanto EFECTIVO retroactivo: no asentar. QR retroactivo sí.
+                        if (!(isRetroactive && method === 'EFECTIVO')) {
                             cashMovementPayload = {
                                 shiftId: '',
                                 type: 'INGRESO' as const,
                                 amount: adelanto,
-                                reason: `Adelanto Venta a Cuotas (${adelantoMethod || 'EFECTIVO'})`,
+                                reason: `Adelanto Venta a Cuotas (${method})${retroNote}`,
                                 date: saleDateObj,
                                 userId: userId,
-                                paymentMethod: (adelantoMethod || 'EFECTIVO') as 'EFECTIVO' | 'QR'
+                                paymentMethod: method
                             };
-                        } else if (paymentMethod !== 'CUOTAS') {
+                        }
+                    } else if (paymentMethod !== 'CUOTAS') {
+                        const method = paymentMethod as 'EFECTIVO' | 'QR' | 'TRANSFERENCIA';
+                        // Solo bloquear EFECTIVO retroactivo. QR / TRANSFERENCIA sí asienta.
+                        if (!(isRetroactive && method === 'EFECTIVO')) {
                             cashMovementPayload = {
                                 shiftId: '',
                                 type: 'INGRESO' as const,
                                 amount: totals.total,
-                                reason: 'Venta POS',
+                                reason: `Venta POS${retroNote}`,
                                 date: saleDateObj,
                                 userId: userId,
-                                paymentMethod: paymentMethod as 'EFECTIVO' | 'QR'
+                                paymentMethod: method as 'EFECTIVO' | 'QR'
                             };
                         }
                     }
