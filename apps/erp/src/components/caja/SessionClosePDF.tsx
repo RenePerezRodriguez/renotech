@@ -523,7 +523,7 @@ const SessionClosePDF: React.FC<Props> = ({ session, config }) => {
                         <View style={styles.sigBox}>
                             <Text style={styles.sigLabel}>Verificación / Gerencia</Text>
                             <Text style={styles.sigName}>
-                                {session.closedByName
+                                {session.closedByRole === 'GERENTE' && session.closedByName
                                     ? formatUserName(session.closedByName).toUpperCase()
                                     : '___________________________'}
                             </Text>
