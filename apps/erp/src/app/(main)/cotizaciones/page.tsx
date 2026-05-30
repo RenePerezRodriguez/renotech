@@ -474,7 +474,7 @@ export default function QuotationsPage() {
                 />
                 <div className="p-4 md:p-0">
                     {/* Mobile Card View - Suite Pro Technical Standard */}
-                    <div className="md:hidden space-y-4">
+                    <div className="lg:hidden space-y-4">
                         {paginatedQuotations.length === 0 ? (
                             <div className="py-20 flex flex-col items-center justify-center text-center px-6">
                                 <div className="w-20 h-20 bg-slate-100 dark:bg-white/5 rounded-3xl flex items-center justify-center mb-6 text-slate-300 group-hover:scale-110 transition-transform">
@@ -547,15 +547,16 @@ export default function QuotationsPage() {
                         )}
                     </div>
 
-                    {/* Desktop Table - Suite Pro High Density */}
-                    <table className="hidden md:table w-full text-left">
+                    {/* Desktop Table — visible lg+ */}
+                    <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-left">
                         <thead className="bg-slate-50 dark:bg-black/40 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] sticky top-0 z-10 border-b border-slate-100 dark:border-white/10 transition-colors">
                             <tr>
                                 <th className="px-6 py-4">Proforma ID</th>
-                                <th className="px-6 py-4">Registro</th>
-                                <th className="px-6 py-4">Cliente Técnico</th>
-                                {isConsolidatedView && <th className="px-4 py-4 text-center">Sucursal</th>}
-                                <th className="px-4 py-4 text-center">Vencimiento</th>
+                                <th className="px-6 py-4 hidden xl:table-cell">Registro</th>
+                                <th className="px-6 py-4">Cliente</th>
+                                {isConsolidatedView && <th className="px-4 py-4 text-center hidden xl:table-cell">Sucursal</th>}
+                                <th className="px-4 py-4 text-center hidden xl:table-cell">Vencimiento</th>
                                 <th className="px-4 py-4 text-right">Total Bs</th>
                                 <th className="px-4 py-4 text-center">Estado</th>
                                 <th className="px-6 py-4 text-center">Gestión</th>
@@ -586,7 +587,7 @@ export default function QuotationsPage() {
                                                     COT-{q.id?.slice(-8).toUpperCase()}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-5 whitespace-nowrap">
+                                            <td className="px-6 py-5 whitespace-nowrap hidden xl:table-cell">
                                                 <div className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-tighter">
                                                     {formatDate(qDate)}
                                                 </div>
@@ -608,7 +609,7 @@ export default function QuotationsPage() {
                                                 </div>
                                             </td>
                                             {isConsolidatedView && (
-                                                <td className="px-4 py-5 text-center">
+                                                <td className="px-4 py-5 text-center hidden xl:table-cell">
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                                                             {(q.usuarioNombre || 'SISTEMA').toUpperCase()}
@@ -616,7 +617,7 @@ export default function QuotationsPage() {
                                                     </div>
                                                 </td>
                                             )}
-                                            <td className="px-4 py-5 text-center">
+                                            <td className="px-4 py-5 text-center hidden xl:table-cell">
                                                 <div className={clsx(
                                                     "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-tight border shadow-sm",
                                                     getExpirationStatus(q.validUntil).color
@@ -676,6 +677,7 @@ export default function QuotationsPage() {
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 <TableFooter

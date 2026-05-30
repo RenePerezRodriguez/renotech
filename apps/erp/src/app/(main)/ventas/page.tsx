@@ -664,8 +664,8 @@ export default function SalesHistoryPage() {
                         className="border-b border-t-0 bg-white/50 dark:bg-black/10"
                     />
 
-                    {/* Mobile Card View - Modernized */}
-                    <div className="md:hidden divide-y divide-slate-100 dark:divide-white/5">
+                    {/* Mobile + Tablet Card View - visible hasta lg */}
+                    <div className="lg:hidden divide-y divide-slate-100 dark:divide-white/5">
                         {paginatedSales.map((sale) => (
                             <div key={sale.id} onClick={() => setSelectedSale(sale)} className={clsx(
                                 "p-5 active:bg-slate-50 dark:active:bg-white/5 transition-colors cursor-pointer relative overflow-hidden",
@@ -730,17 +730,19 @@ export default function SalesHistoryPage() {
                         ))}
                     </div>
 
-                    {/* Desktop Table - Suite Pro Tech Standard */}
-                    <table className="hidden md:table w-full text-sm text-left">
+                    {/* Desktop Table — visible desde lg. Columnas opcionales
+                        ocultas en lg, visibles solo en xl+ para evitar truncado. */}
+                    <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50 dark:bg-black/40 text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] transition-colors border-b border-slate-200 dark:border-white/10">
                             <tr>
-                                <th className="px-6 py-4">Ref. Auditoría</th>
-                                <th className="px-6 py-4">Timestamp</th>
-                                <th className="px-6 py-4">Titular de Operación</th>
-                                {isConsolidatedView && <th className="px-6 py-4">Sucursal</th>}
-                                <th className="px-6 py-4">Agente</th>
+                                <th className="px-6 py-4">Ref.</th>
+                                <th className="px-6 py-4 hidden xl:table-cell">Timestamp</th>
+                                <th className="px-6 py-4">Cliente</th>
+                                {isConsolidatedView && <th className="px-6 py-4 hidden xl:table-cell">Sucursal</th>}
+                                <th className="px-6 py-4 hidden xl:table-cell">Agente</th>
                                 <th className="px-6 py-4 text-center">Modo</th>
-                                <th className="px-6 py-4 text-right">Monto Bruto</th>
+                                <th className="px-6 py-4 text-right">Total</th>
                                 <th className="px-6 py-4 text-center">Status</th>
                                 <th className="px-6 py-4 text-center">Acciones</th>
                             </tr>
@@ -756,7 +758,7 @@ export default function SalesHistoryPage() {
                                             VEN-{sale.id?.slice(-8).toUpperCase()}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap hidden xl:table-cell">
                                         <div className="text-[10px] font-bold text-slate-900 dark:text-white uppercase">
                                             {formatBoDate(sale.fecha)}
                                         </div>
@@ -771,13 +773,13 @@ export default function SalesHistoryPage() {
                                         <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-0.5">ID Fiscal: {sale.cliente?.nit || 'S/N'}</div>
                                     </td>
                                     {isConsolidatedView && (
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 hidden xl:table-cell">
                                             <span className="px-2 py-0.5 rounded text-[8px] font-black text-blue-500 dark:text-blue-400 bg-blue-500/10 border border-blue-500/20 uppercase tracking-widest">
                                                 {branches.find(b => b.id === sale.branchId)?.name || 'S/D'}
                                             </span>
                                         </td>
                                     )}
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 hidden xl:table-cell">
                                         <div className="flex flex-col">
                                             <span className="text-[9px] font-black uppercase text-slate-900 dark:text-slate-300 tracking-widest">
                                                 {formatUserName(sale.usuarioNombre) || 'SYSTEM_CORE'}
@@ -859,6 +861,7 @@ export default function SalesHistoryPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                     {(loading || filteredSales.length === 0) && (
                         <>
                             {/* Empty State - Suite Pro Tech */}

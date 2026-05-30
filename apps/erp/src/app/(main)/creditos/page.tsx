@@ -523,13 +523,21 @@ export default function CreditosPage() {
                     </div>
                 ) : (
                     <>
-                        {/* Desktop Table */}
-                        <div className="hidden md:block overflow-x-auto">
+                        {/* Desktop Table (lg+) */}
+                        <div className="hidden lg:block overflow-x-auto">
                             <table className="w-full">
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-[#111827]">
-                                        {['Cliente', 'Venta', 'Deuda total', 'Restante', 'Vencimiento', 'Estado', 'Acciones'].map(h => (
-                                            <th key={h} className="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">{h}</th>
+                                        {[
+                                            { label: 'Cliente', className: '' },
+                                            { label: 'Venta', className: 'hidden xl:table-cell' },
+                                            { label: 'Deuda total', className: 'hidden xl:table-cell' },
+                                            { label: 'Restante', className: '' },
+                                            { label: 'Vencimiento', className: 'hidden xl:table-cell' },
+                                            { label: 'Estado', className: '' },
+                                            { label: 'Acciones', className: '' },
+                                        ].map(h => (
+                                            <th key={h.label} className={clsx('px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500', h.className)}>{h.label}</th>
                                         ))}
                                     </tr>
                                 </thead>
@@ -547,14 +555,14 @@ export default function CreditosPage() {
                                                     <p className="text-xs font-bold uppercase text-slate-900 dark:text-white">{client?.razonSocial || credit.clientName || 'Sin nombre'}</p>
                                                     <p className="text-[10px] text-slate-400">{client?.nit || '-'}</p>
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-4 py-3 hidden xl:table-cell">
                                                     <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 tabular-nums">VEN-{credit.saleId?.slice(-8).toUpperCase()}</p>
                                                     {credit.productsSummary && (
                                                         <p className="text-[9px] text-slate-400 wrap-break-word" title={credit.productsSummary}>{credit.productsSummary}</p>
                                                     )}
                                                     <p className="text-[9px] text-slate-400 mt-1">Cuotas {credit.pendingCount}/{credit.totalInstallments}</p>
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-4 py-3 hidden xl:table-cell">
                                                     <span className="text-xs font-black tabular-nums text-slate-900 dark:text-white">{credit.saleTotal.toFixed(2)} Bs.</span>
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -563,7 +571,7 @@ export default function CreditosPage() {
                                                         credit.totalRemaining > 0 ? "text-amber-600 dark:text-amber-500" : "text-blue-500"
                                                     )}>{credit.totalRemaining.toFixed(2)} Bs.</span>
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-4 py-3 hidden xl:table-cell">
                                                     <div className="flex items-center gap-1.5">
                                                         <Calendar size={12} className="text-slate-400" />
                                                         <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 tabular-nums">{due.toLocaleDateString('es-BO')}</span>
@@ -606,7 +614,7 @@ export default function CreditosPage() {
                         </div>
 
                         {/* Mobile Cards */}
-                        <div className="md:hidden divide-y divide-slate-100 dark:divide-white/5">
+                        <div className="lg:hidden divide-y divide-slate-100 dark:divide-white/5">
                             {paged.map(credit => {
                                 const client = clients[credit.clientId];
                                 const due = credit.nextDueDate || ensureDate(credit.createdAt);

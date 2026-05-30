@@ -413,7 +413,7 @@ export default function PurchasesPage() {
                 <div className="overflow-auto flex-1 custom-scrollbar p-6 md:p-0">
 
                     {/* Mobile Card View */}
-                    <div className="md:hidden space-y-3">
+                    <div className="lg:hidden space-y-3">
                         {!loading && paginatedPurchases.length === 0 && (
                             <div className="flex flex-col items-center justify-center py-20 text-slate-300 dark:text-slate-600">
                                 <Truck size={48} strokeWidth={0.5} className="mb-3 opacity-40" />
@@ -490,16 +490,17 @@ export default function PurchasesPage() {
                     </div>
 
                     {/* Desktop Table - High Density */}
-                    <table className="hidden md:table w-full text-sm text-left border-separate border-spacing-0">
+                    <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-sm text-left border-separate border-spacing-0">
                         <thead className="bg-slate-50 dark:bg-[#020617] border-b border-slate-200 dark:border-white/10 transition-colors z-20 sticky top-0">
                             <tr className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
                                 <th className="px-6 py-4">Código</th>
-                                <th className="px-6 py-4">Fecha</th>
+                                <th className="px-6 py-4 hidden xl:table-cell">Fecha</th>
                                 <th className="px-6 py-4">Proveedor</th>
-                                <th className="px-6 py-4 text-center">Productos</th>
+                                <th className="px-6 py-4 text-center hidden xl:table-cell">Productos</th>
                                 <th className="px-6 py-4 text-right">Total (Bs)</th>
                                 <th className="px-6 py-4 text-center">Estado</th>
-                                <th className="px-6 py-4">Responsable</th>
+                                <th className="px-6 py-4 hidden xl:table-cell">Responsable</th>
                                 <th className="px-6 py-4 text-right pr-6 min-w-20"></th>
                             </tr>
                         </thead>
@@ -530,7 +531,7 @@ export default function PurchasesPage() {
                                                 COM-{purchase.id?.slice(-6).toUpperCase()}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-6 py-4 whitespace-nowrap hidden xl:table-cell">
                                             <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase">
                                                 {formatDate(purchase.date)}
                                             </div>
@@ -573,7 +574,7 @@ export default function PurchasesPage() {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        <td className="px-6 py-4 text-center hidden xl:table-cell">
                                             <span className="text-[10px] font-black text-slate-600 dark:text-slate-400">
                                                 {purchase.itemCount ?? '—'}
                                             </span>
@@ -591,7 +592,7 @@ export default function PurchasesPage() {
                                                 {purchase.status === 'RECEIVED' ? 'Recibida' : 'Pendiente'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
+                                        <td className="px-6 py-4 whitespace-nowrap hidden xl:table-cell">
                                             <div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
                                                 {formatUserName(purchase.usuarioNombre) || 'SISTEMA'}
                                             </div>
@@ -612,6 +613,7 @@ export default function PurchasesPage() {
                             )}
                         </tbody>
                     </table>
+                    </div>
 
 
                 </div>
