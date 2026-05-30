@@ -389,7 +389,8 @@ export default function SalesHistoryPage() {
             }
         } catch (e) {
             console.error(e);
-            toast.error(type === 'SALE' ? 'Error al anular la venta' : 'Error al procesar la devolución');
+            const msg = e instanceof Error ? e.message : '';
+            toast.error(msg || (type === 'SALE' ? 'Error al anular la venta' : 'Error al procesar la devolución'));
         } finally {
             setIsVoiding(null);
         }
