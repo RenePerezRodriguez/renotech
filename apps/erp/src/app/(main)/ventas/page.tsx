@@ -12,7 +12,7 @@ import { SaleApprovalService } from '@/services/SaleApprovalService';
 import { CashierSessionService } from '@/services/CashierSessionService';
 import { Sale, SaleItem, Installment } from '@/types';
 import { useTransactionItems } from '@/hooks/useTransactionItems';
-import { Eye, Printer, ShoppingBag, Download, RotateCcw, User, AlertTriangle, CornerUpLeft, TrendingUp, Calendar, X, CreditCard, WifiOff, RefreshCw, Trash2 } from 'lucide-react';
+import { Eye, Printer, ShoppingBag, Download, RotateCcw, User, AlertTriangle, CornerUpLeft, TrendingUp, Calendar, X, CreditCard, WifiOff, RefreshCw, Trash2, Clock } from 'lucide-react';
 import { PrintService } from '@/services/PrintService';
 import { useAuth } from '@/contexts/AuthContext';
 import clsx from 'clsx';
@@ -33,7 +33,7 @@ import FilterBar from '@/components/common/FilterBar';
 import TableFooter from '@/components/common/TableFooter';
 
 export default function SalesHistoryPage() {
-    const { user: currentUser, role: userRole } = useAuth();
+    const { user: currentUser, role: userRole, userName } = useAuth();
     const { currentBranch, branches, isConsolidatedView, loading: branchLoading } = useBranch();
     const [sales, setSales] = useState<Sale[]>([]);
     const [loading, setLoading] = useState(true);
@@ -110,6 +110,7 @@ export default function SalesHistoryPage() {
     const [userFilter, setUserFilter] = useState('Todos');
     const [branchFilter, setBranchFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'VALID' | 'VOIDED'>('ALL');
+    const [pendingVoidSaleIds, setPendingVoidSaleIds] = useState<Set<string>>(new Set());
 
     const loadSales = useCallback(async () => {
         if (branchLoading) return;
@@ -167,6 +168,25 @@ export default function SalesHistoryPage() {
         );
         return () => unsub();
     }, [userRole, currentBranch?.id, isConsolidatedView, branchLoading, branchFilter, loadSales]);
+
+    // Subscribe to pending void approvals so we can show "Esperando aprobación"
+    // on sales that have a pending request.
+    useEffect(() => {
+        if (branchLoading) return;
+        const constraints: QueryConstraint[] = [fsWhere('status', '==', 'PENDING')];
+        const branchId = isConsolidatedView ? undefined : currentBranch?.id;
+        if (branchId) constraints.push(fsWhere('branchId', '==', branchId));
+        const q = fsQuery(collection(db, 'pending_void_approvals'), ...constraints);
+        const unsub = onSnapshot(q, snap => {
+            const ids = new Set<string>();
+            snap.docs.forEach(d => {
+                const sId = d.data().saleId;
+                if (sId) ids.add(sId);
+            });
+            setPendingVoidSaleIds(ids);
+        }, err => console.error('pending_void_approvals onSnapshot:', err));
+        return () => unsub();
+    }, [currentBranch?.id, isConsolidatedView, branchLoading]);
 
     const handlePrint = async (sale: Sale) => {
         toast.promise(
@@ -348,7 +368,7 @@ export default function SalesHistoryPage() {
                     await SaleApprovalService.requestVoidApproval(
                         sale.id,
                         currentUser?.uid || '?',
-                        currentUser?.email || '?',
+                        userName || currentUser?.email || '?',
                         voidReason
                     );
                     toast.success('Solicitud enviada al GERENTE para aprobación.');
@@ -654,6 +674,12 @@ export default function SalesHistoryPage() {
                                 {sale.status === 'VOIDED' && (
                                     <div className="absolute -right-6 top-3 bg-rose-500 text-white text-[8px] font-black py-1 px-8 rotate-45 uppercase tracking-widest shadow-lg">ANULADA</div>
                                 )}
+                                {sale.id && pendingVoidSaleIds.has(sale.id) && sale.status !== 'VOIDED' && (
+                                    <div className="mb-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-[9px] font-black uppercase tracking-widest">
+                                        <Clock size={11} strokeWidth={2.5} />
+                                        Esperando aprobación del gerente
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-1.5">
@@ -784,15 +810,22 @@ export default function SalesHistoryPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-center">
-                                        <div className={clsx(
-                                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[8px] font-black uppercase tracking-widest border",
-                                            sale.status === 'VOIDED' 
-                                                ? "bg-rose-500/10 text-rose-500 border-rose-500/20" 
-                                                : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                        )}>
-                                            <div className={clsx("w-1 h-1 rounded-full animate-pulse", sale.status === 'VOIDED' ? "bg-rose-500" : "bg-emerald-500")} />
-                                            {sale.status === 'VOIDED' ? 'Anulada' : 'Válida'}
-                                        </div>
+                                        {sale.id && pendingVoidSaleIds.has(sale.id) && sale.status !== 'VOIDED' ? (
+                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[8px] font-black uppercase tracking-widest border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                                                <Clock size={10} strokeWidth={2.5} />
+                                                Esperando aprobación
+                                            </div>
+                                        ) : (
+                                            <div className={clsx(
+                                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[8px] font-black uppercase tracking-widest border",
+                                                sale.status === 'VOIDED'
+                                                    ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                                    : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                            )}>
+                                                <div className={clsx("w-1 h-1 rounded-full animate-pulse", sale.status === 'VOIDED' ? "bg-rose-500" : "bg-emerald-500")} />
+                                                {sale.status === 'VOIDED' ? 'Anulada' : 'Válida'}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex justify-end gap-1.5">
