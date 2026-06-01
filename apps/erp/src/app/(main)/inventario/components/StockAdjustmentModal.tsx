@@ -49,8 +49,9 @@ export default function StockAdjustmentModal({ product, onClose, onSuccess }: St
             );
             onSuccess();
             onClose();
-        } catch {
-            toast.error('Error al ajustar el stock');
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : '';
+            toast.error(msg || 'Error al ajustar el stock');
         } finally {
             setIsSubmitting(false);
         }

@@ -375,13 +375,76 @@ export const InventoryService = {
         if (!Number.isFinite(quantity) || quantity <= 0) {
             throwStandardError('INV_INVALID_ADJUSTMENT', 'La cantidad debe ser mayor a 0');
         }
+
+        // Detección de producto "virtual": aún no tiene documento físico en esta
+        // sucursal (existe solo en el catálogo maestro y se muestra hidratado).
+        //   ID virtual: `virtual-{masterId}-{branchId}` (lo genera useProducts).
+        //   ID real:    `{branchId}_{masterId}`.
+        // Si es virtual, resolvemos la ref real determinística para materializarlo.
+        const isVirtual = productId.startsWith('virtual-');
+        const virtualMasterId = isVirtual ? productId.split('-')[1] : null;
+        const realProductId = isVirtual ? `${branchId}_${virtualMasterId}` : productId;
+
         await runTransaction(db, async (transaction) => {
-            const productRef = doc(db, COLLECTION_NAME, productId);
+            const productRef = doc(db, COLLECTION_NAME, realProductId);
             const productSnap = await transaction.get(productRef);
 
-            if (!productSnap.exists()) throwStandardError('INV_PRODUCT_NOT_FOUND', productId);
+            // ── CASO 1: el producto NO existe físicamente en la sucursal ──────────
+            if (!productSnap.exists()) {
+                // Sin masterId derivable no podemos materializar → error real.
+                if (!virtualMasterId) throwStandardError('INV_PRODUCT_NOT_FOUND', productId);
+                // No se puede RETIRAR de un producto que todavía no existe.
+                if (type === 'SALIDA') {
+                    throwStandardError('INV_INSUFFICIENT_STOCK', 'El producto no tiene stock en esta sucursal');
+                }
+                // Leer el catálogo maestro (READ antes de cualquier WRITE).
+                const masterRef = doc(db, MASTER_COLLECTION, virtualMasterId);
+                const masterSnap = await transaction.get(masterRef);
+                if (!masterSnap.exists()) throwStandardError('INV_PRODUCT_NOT_FOUND', virtualMasterId);
+                const mData = masterSnap.data();
+
+                const newStock = quantity;
+                // Crear la existencia local hidratada desde el maestro.
+                // Mismo patrón que PurchaseService al comprar un producto nuevo en sucursal.
+                transaction.set(productRef, {
+                    masterId: virtualMasterId,
+                    branchId,
+                    stock: newStock,
+                    minStock: 5,
+                    isActive: true,
+                    ubicacionFisica: '',
+                    costo: Number(mData.costoBase) || 0,
+                    precioOverride: mData.precioConFactura ?? mData.precioDefault ?? 0,
+                    precioConFactura: mData.precioConFactura ?? mData.precioDefault ?? 0,
+                    precioSinFactura: mData.precioSinFactura ?? mData.precioDefault ?? 0,
+                    precioMayorista: 0,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
+
+                // Kardex del alta inicial en la sucursal.
+                const movRef = doc(collection(db, 'movimientos'));
+                transaction.set(movRef, {
+                    productId: realProductId,
+                    masterId: virtualMasterId,
+                    type: 'ENTRADA',
+                    quantity,
+                    currentStock: newStock,
+                    previousStock: 0,
+                    reason: `Ajuste (alta en sucursal): ${reason}`,
+                    referenceId: referenceId || null,
+                    date: serverTimestamp(),
+                    userId,
+                    userName,
+                    branchId,
+                    createdAt: serverTimestamp()
+                });
+                return;
+            }
+
+            // ── CASO 2: el producto YA existe (flujo original, sin cambios) ───────
             const pData = productSnap.data();
-            
+
             const currentStock = pData.stock || 0;
             let newStock = currentStock;
 
@@ -405,9 +468,9 @@ export const InventoryService = {
                         severity,
                         branchId,
                         userId,
-                        message: `AJUSTE de stock con discrepancia ${discrepancyPct.toFixed(1)}% en "${pData.nombre || productId}". Stock Previo: ${currentStock}, Ajuste: ${quantity}`,
+                        message: `AJUSTE de stock con discrepancia ${discrepancyPct.toFixed(1)}% en "${pData.nombre || realProductId}". Stock Previo: ${currentStock}, Ajuste: ${quantity}`,
                         metadata: {
-                            productId,
+                            productId: realProductId,
                             previousStock: currentStock,
                             newStock,
                             adjustmentQty: quantity,
@@ -422,7 +485,7 @@ export const InventoryService = {
             // Kardex Movement
             const movRef = doc(collection(db, 'movimientos'));
             transaction.set(movRef, {
-                productId,
+                productId: realProductId,
                 masterId: pData.masterId || null,
                 type,
                 quantity,

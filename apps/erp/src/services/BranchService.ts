@@ -14,7 +14,8 @@ import {
     serverTimestamp,
     limit,
     runTransaction,
-    writeBatch
+    writeBatch,
+    arrayUnion
 } from 'firebase/firestore';
 
 const COLLECTION = 'branches';
@@ -106,6 +107,10 @@ export const BranchService = {
 
         // Auto-provisión: crear Caja POS + Bóveda inherentes a la sucursal
         await this._provisionTreasuryAccounts(docRef.id, data.name);
+
+        // Auto-asignar cuenta bancaria por defecto (QR/TRANSFERENCIA) si hay una sola.
+        // Sin esto, vender/comprar con QR o TRANSFERENCIA falla con "no hay cuenta asignada".
+        await this._autoAssignDefaultBankAccount(docRef.id);
 
         return docRef.id;
     },
@@ -266,6 +271,48 @@ export const BranchService = {
         });
 
         await batch.commit();
+    },
+
+    /**
+     * @internal Auto-asigna la cuenta bancaria por defecto (QR + TRANSFERENCIA)
+     * a una sucursal recién creada. Solo actúa si existe EXACTAMENTE UNA cuenta
+     * BANK activa (caso típico de PyME con una sola cuenta). Con varias cuentas,
+     * no asume nada y deja que el gerente elija manualmente en Tesorería.
+     *
+     * Best-effort: si falla, la sucursal queda sin default (configurable a mano)
+     * sin abortar la creación de la sucursal.
+     */
+    async _autoAssignDefaultBankAccount(branchId: string): Promise<void> {
+        try {
+            const q = query(
+                collection(db, 'accounts'),
+                where('type', '==', 'BANK'),
+                where('isActive', '==', true)
+            );
+            const snap = await getDocs(q);
+            if (snap.size !== 1) return; // 0 o >1 → no auto-asignar
+
+            const bankDoc = snap.docs[0];
+            const batch = writeBatch(db);
+
+            // 1) Default QR + TRANSFERENCIA de la sucursal apuntan a esa cuenta.
+            //    Dot-notation: crea config.defaultAccounts sin pisar otros campos de config.
+            batch.update(doc(db, COLLECTION, branchId), {
+                'config.defaultAccounts.QR': bankDoc.id,
+                'config.defaultAccounts.TRANSFERENCIA': bankDoc.id,
+                updatedAt: serverTimestamp(),
+            });
+
+            // 2) Habilitar la cuenta para esta sucursal (branchIds[] multi-sucursal).
+            batch.update(bankDoc.ref, {
+                branchIds: arrayUnion(branchId),
+                updatedAt: serverTimestamp(),
+            });
+
+            await batch.commit();
+        } catch (e) {
+            console.warn('[BranchService] No se pudo auto-asignar cuenta bancaria por defecto:', e);
+        }
     },
 
     /**
